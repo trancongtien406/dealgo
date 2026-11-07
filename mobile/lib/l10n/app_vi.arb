@@ -2205,6 +2205,32 @@
   "securityPasskeyExists": "Thiết bị này đã có passkey cho tài khoản.",
   "securityPasskeyFailed": "Chưa thêm được passkey. Vui lòng thử lại.",
   "securityPasskeyNeedsVerifiedLogin": "Cần xác minh tài khoản trước khi thêm passkey.",
+  "securityPasskeysCount": "{count, plural, =0{Chưa thiết lập} =1{1 passkey} other{{count} passkey}}",
+  "passkeysHeader": "Passkey",
+  "passkeysTitle": "Passkey của tài khoản",
+  "passkeysIntro": "Passkey cho phép đăng nhập bằng vân tay, khuôn mặt hoặc khóa màn hình thay vì mã xác minh. Hãy thêm trên từng thiết bị bạn dùng.",
+  "passkeysAdd": "Thêm passkey cho thiết bị này",
+  "passkeysEmpty": "Chưa có passkey. Thêm để đăng nhập nhanh và an toàn hơn.",
+  "passkeysItemTitle": "Passkey",
+  "passkeysAddedOn": "Thêm lúc {date}",
+  "passkeysSynced": "Đồng bộ giữa các thiết bị của bạn",
+  "passkeysThisDeviceOnly": "Chỉ lưu trên một thiết bị",
+  "passkeysRemove": "Xóa",
+  "passkeysRemoveTitle": "Xóa passkey này?",
+  "passkeysRemoveBody": "Bạn sẽ không thể đăng nhập bằng passkey này nữa. Các cách đăng nhập khác giữ nguyên.",
+  "passkeysRemoved": "Đã xóa passkey.",
+  "passkeysLastCredential": "Đây là cách đăng nhập duy nhất của bạn. Hãy thêm số điện thoại/email đã xác minh hoặc passkey khác trước.",
+  "passkeysLoadFailed": "Không tải được danh sách passkey.",
+  "sessionsActiveNow": "Đang hoạt động",
+  "sessionsLastActive": "Hoạt động gần nhất {when}",
+  "sessionsSignedInAt": "Đăng nhập lúc {when}",
+  "sessionsIp": "IP {ip}",
+  "sessionsAdminWeb": "Admin Web",
+  "sessionsUnknownDevice": "Thiết bị không xác định",
+  "sessionsLogoutTitle": "Đăng xuất thiết bị này?",
+  "sessionsLogoutBody": "Thiết bị sẽ phải đăng nhập lại. Nếu không nhận ra thiết bị này, hãy kiểm tra lại các phương thức đăng nhập.",
+  "sessionsLogoutOthersTitle": "Đăng xuất tất cả thiết bị khác?",
+  "sessionsCount": "{count} thiết bị đang đăng nhập",
   "merchantProfileTitle": "Hồ sơ quán",
   "merchantProfileName": "Tên quán",
   "merchantProfileNameInvalid": "Tên quán cần từ 2 đến 120 ký tự.",
@@ -2418,6 +2444,37 @@
   "merchantOfferSave": "Tạo ưu đãi",
   "merchantReviewsTitle": "Đánh giá của khách",
   "merchantReviewsEmpty": "Chưa có đánh giá",
+  "merchantReviewsFilterNone": "Không có đánh giá phù hợp bộ lọc",
+  "merchantReviewsSearch": "Tìm kiếm nhận xét hoặc phản hồi...",
+  "merchantReviewsFilterTitle": "Bộ lọc & Sắp xếp",
+  "merchantReviewsFilterStars": "Số sao",
+  "merchantReviewsFilterReplied": "Phản hồi quán",
+  "merchantReviewsFilterRepliedAll": "Tất cả",
+  "merchantReviewsFilterRepliedYes": "Đã phản hồi",
+  "merchantReviewsFilterRepliedNo": "Chưa phản hồi",
+  "merchantReviewsFilterComment": "Bình luận",
+  "merchantReviewsFilterCommentAll": "Tất cả",
+  "merchantReviewsFilterCommentOnly": "Có nhận xét",
+  "merchantReviewsFilterVisibility": "Trạng thái hiển thị",
+  "merchantReviewsFilterVisAll": "Tất cả",
+  "merchantReviewsFilterVisVisible": "Đang hiển thị",
+  "merchantReviewsFilterVisHidden": "Đã ẩn",
+  "merchantReviewsFilterTags": "Nhãn đánh giá",
+  "merchantReviewsFilterTagAll": "Tất cả nhãn",
+  "merchantReviewsFilterDate": "Khoảng thời gian",
+  "merchantReviewsFilterDateAll": "Toàn bộ",
+  "merchantReviewsFilterDateToday": "Hôm nay",
+  "merchantReviewsFilterDate7Days": "7 ngày qua",
+  "merchantReviewsFilterDate30Days": "30 ngày qua",
+  "merchantReviewsFilterDateCustom": "Chọn dải ngày",
+  "merchantReviewsFilterSort": "Sắp xếp",
+  "merchantReviewsFilterSortNewest": "Mới nhất",
+  "merchantReviewsFilterSortOldest": "Cũ nhất",
+  "merchantReviewsFilterSortLowest": "Điểm thấp nhất",
+  "merchantReviewsFilterSortHighest": "Điểm cao nhất",
+  "merchantReviewsFilterReset": "Đặt lại",
+  "merchantReviewsFilterApply": "Áp dụng",
+  "merchantReviewsFilterActive": "Đã lọc",
   "merchantReviewHidden": "Đã ẩn",
   "merchantReviewReply": "Phản hồi",
   "merchantReviewEditReply": "Sửa phản hồi",
@@ -2695,6 +2752,8 @@
   "legalConsentFailed": "Không gửi được. Vui lòng thử lại.",
   "contactPhoneDial": "Gọi điện {phone}",
   "contactPhoneDialFailed": "Không mở được ứng dụng gọi điện.",
+  "contactPhoneSimLabel": "Gọi qua số máy (SIM)",
+  "contactPhoneCallNow": "Gọi ngay",
   "kycReviewAvatar": "Ảnh đại diện",
   "kycAvatarMissing": "Bắt buộc trước khi nộp. Khách hàng sẽ thấy ảnh này khi bạn nhận cuốc.",
   "kycAvatarReady": "Khách hàng sẽ thấy ảnh này khi bạn nhận cuốc.",
@@ -2722,8 +2781,7 @@
   "driverFareFixed": "Đơn này áp dụng giá cố định: bạn chỉ có thể nhận đúng phí khách đưa ra.",
   "foodFareDecrease": "Giảm phí giao",
   "foodFareIncrease": "Tăng phí giao",
-  "foodFareReset": "Dùng phí gợi ý",
-  "foodFareNegotiationTitle": "Phí giao",
+   "foodFareNegotiationTitle": "Phí giao",
   "foodFareWaiting": "Đang chờ tài xế nhận giá {amount}",
   "foodFareAgreed": "Phí giao đã chốt: {amount}",
   "foodFareOffersEmpty": "Chưa có tài xế đề xuất giá khác.",
@@ -2812,5 +2870,166 @@
   "foodVoucherWallTitle": "Ưu đãi hôm nay",
   "foodVoucherWallSeeAll": "Xem tất cả",
   "foodReorderTitle": "Đặt lại đơn quen",
-  "foodReorderStripItems": "{count} món · {total}"
+  "foodReorderStripItems": "{count} món · {total}",
+  "merchantItemPhotoCount": "{count}/{max} ảnh",
+  "@merchantItemPhotoCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantItemPhotoLimitError": "Tối đa {max} ảnh cho mỗi món ăn.",
+  "@merchantItemPhotoLimitError": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantItemPhotoHint": "Ảnh đầu tiên là ảnh đại diện. Thêm hoặc xoá ảnh sẽ được lưu cùng biểu mẫu.",
+  "merchantItemPhotoCover": "Ảnh bìa",
+  "merchantItemPhotoNew": "Mới",
+  "merchantItemPhotoEmpty": "Chưa có ảnh",
+  "merchantItemPhotoCamera": "Chụp ảnh",
+  "merchantItemCategoryNone": "Chưa phân loại",
+  "merchantItemCategoryCreateTitle": "Tạo danh mục mới",
+  "merchantItemPricingSection": "Giá bán & Khuyến mãi",
+  "merchantItemPrepSection": "Chế biến & Hiển thị",
+  "merchantItemPrepMinutesChip": "{minutes} phút",
+  "@merchantItemPrepMinutesChip": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantItemPrepClear": "Xoá",
+  "merchantItemOptionsGroupCount": "{count} nhóm",
+  "@merchantItemOptionsGroupCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantItemOptionsChoicesCount": "Các lựa chọn ({count})",
+  "@merchantItemOptionsChoicesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantItemOptionsDefaultChoice": "Mặc định",
+  "merchantItemDeleteAction": "Xoá món ăn",
+  "merchantItemDeleteConfirmTitle": "Xoá món ăn?",
+  "merchantItemDeleteConfirmBody": "Món \"{name}\" sẽ bị xoá khỏi thực đơn.",
+  "@merchantItemDeleteConfirmBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "merchantItemDeleted": "Đã xoá món ăn",
+  "merchantProductsAllCategories": "Tất cả danh mục",
+  "merchantProductsCount": "{shown}/{total} món",
+  "@merchantProductsCount": {
+    "placeholders": {
+      "shown": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantStatsRange14": "14 ngày",
+  "merchantStatsMetricOrders": "Đơn hàng",
+  "merchantStatsMetricRevenue": "Doanh thu",
+  "merchantStatsAvgOrderValue": "Giá trị TB/đơn",
+  "merchantStatsCompletionRate": "Tỷ lệ hoàn tất",
+  "merchantStatsCancelledOrders": "Đơn đã huỷ",
+  "merchantStatsDailyAvgSales": "TB doanh thu/ngày",
+  "merchantStatsPeakDay": "Ngày cao điểm",
+  "merchantStatsSelectedDay": "Ngày {date}",
+  "@merchantStatsSelectedDay": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "merchantStatsTapBarHint": "Chạm vào cột biểu đồ để xem chi tiết từng ngày",
+  "merchantStatsItemShare": "{percent}% tổng phần bán",
+  "@merchantStatsItemShare": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantStatsQuickHistory": "Lịch sử đơn",
+  "merchantStatsQuickOffers": "Ưu đãi quán",
+  "merchantStatsQuickReviews": "Phản hồi đánh giá",
+  "merchantStatsStatementHistoryBtn": "Xem {count} kỳ đối soát",
+  "@merchantStatsStatementHistoryBtn": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantStatsStatementHistoryTitle": "Lịch sử các kỳ đối soát",
+  "merchantStatsMenuStatus": "Tình trạng thực đơn",
+  "merchantStatsMenuItemsCount": "{available}/{total} món đang mở bán",
+  "@merchantStatsMenuItemsCount": {
+    "placeholders": {
+      "available": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantStatsDayDetailTitle": "Chi tiết ngày {date}",
+  "@merchantStatsDayDetailTitle": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "merchantStatsNetShare": "Thực nhận ({percent}%)",
+  "@merchantStatsNetShare": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantStatsCommissionShare": "Hoa hồng ({percent}%)",
+  "@merchantStatsCommissionShare": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantStatsDayRow": "{delivered} hoàn tất · {cancelled} huỷ",
+  "@merchantStatsDayRow": {
+    "placeholders": {
+      "delivered": {
+        "type": "int"
+      },
+      "cancelled": {
+        "type": "int"
+      }
+    }
+  }
 }

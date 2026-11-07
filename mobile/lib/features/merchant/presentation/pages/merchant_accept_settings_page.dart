@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
@@ -117,39 +116,76 @@ class _MerchantAcceptSettingsPageState
     required T current,
     required String Function(T value) label,
     required ValueChanged<T> onPicked,
+    String? title,
   }) async {
     final l10n = AppLocalizations.of(context);
     final picked = await showDealGoSheet<(T,)>(
       context: context,
+      isScrollControlled: true,
       builder: (sheetContext) => SafeArea(
+        top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            DealGoSpacing.s16,
-            DealGoSpacing.s20,
-            DealGoSpacing.s16,
-            DealGoSpacing.s16,
-          ),
+          padding: const EdgeInsets.symmetric(vertical: DealGoSpacing.s16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                l10n.merchantAcceptPickTitle,
-                style: Theme.of(sheetContext).textTheme.titleMedium,
-              ),
-              const SizedBox(height: DealGoSpacing.s12),
-              Wrap(
-                spacing: DealGoSpacing.s8,
-                runSpacing: DealGoSpacing.s8,
-                children: [
-                  for (final option in options)
-                    DealGoChip(
-                      key: Key('$keyPrefix-${option ?? 'none'}'),
-                      label: label(option),
-                      selected: option == current,
-                      onTap: () => Navigator.of(sheetContext).pop((option,)),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: DealGoDimensions.pageGutter,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title ?? l10n.merchantAcceptPickTitle,
+                        style: Theme.of(sheetContext).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
                     ),
-                ],
+                    IconButton(
+                      icon: const Icon(DealGoIcons.close, size: 20),
+                      onPressed: () => Navigator.of(sheetContext).pop(),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: DealGoSpacing.s8),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.5,
+                ),
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final option in options)
+                      ListTile(
+                        key: Key('$keyPrefix-${option ?? 'none'}'),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: DealGoDimensions.pageGutter,
+                        ),
+                        title: Text(
+                          label(option),
+                          style: Theme.of(sheetContext).textTheme.bodyLarge
+                              ?.copyWith(
+                                fontWeight: option == current
+                                    ? FontWeight.w700
+                                    : FontWeight.w400,
+                                color: option == current
+                                    ? DealGoColors.primary
+                                    : null,
+                              ),
+                        ),
+                        trailing: option == current
+                            ? const Icon(
+                                DealGoIcons.check,
+                                color: DealGoColors.primary,
+                              )
+                            : null,
+                        onTap: () => Navigator.of(sheetContext).pop((option,)),
+                      ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -223,17 +259,6 @@ class _MerchantAcceptSettingsPageState
     return ListView(
       padding: dealGoScrollPadding(context, merchantPagePadding),
       children: [
-        Text(
-          l10n.merchantAcceptEyebrow,
-          style: textTheme.labelSmall?.copyWith(
-            color: DealGoColors.primary,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.2,
-          ),
-        ),
-        const SizedBox(height: DealGoSpacing.s4),
-        Text(l10n.merchantAcceptHeading, style: textTheme.headlineSmall),
-        const SizedBox(height: DealGoSpacing.s16),
         MerchantPanel(
           color: DealGoColors.subtlePurple,
           child: Row(
@@ -304,6 +329,7 @@ class _MerchantAcceptSettingsPageState
                 title: l10n.merchantAcceptMaxActive,
                 value: maxLabel(_settings.maxActiveOrders),
                 onTap: () => _pick<int?>(
+                  title: l10n.merchantAcceptMaxActive,
                   keyPrefix: 'merchant-accept-max-option',
                   options: merchantMaxActivePresets,
                   current: _settings.maxActiveOrders,
@@ -322,6 +348,7 @@ class _MerchantAcceptSettingsPageState
                 title: l10n.merchantAcceptPrep,
                 value: minutesLabel(_settings.defaultPrepMinutes),
                 onTap: () => _pick<int>(
+                  title: l10n.merchantAcceptPrep,
                   keyPrefix: 'merchant-accept-prep-option',
                   options: merchantPrepPresets,
                   current: _settings.defaultPrepMinutes,
@@ -336,6 +363,7 @@ class _MerchantAcceptSettingsPageState
                 title: l10n.merchantAcceptCutoff,
                 value: minutesLabel(_lastOrder),
                 onTap: () => _pick<int>(
+                  title: l10n.merchantAcceptCutoff,
                   keyPrefix: 'merchant-accept-cutoff-option',
                   options: merchantLastOrderPresets,
                   current: _lastOrder,

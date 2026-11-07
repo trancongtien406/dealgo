@@ -53,9 +53,11 @@ describe("account deletion helpers (S027)", () => {
   it("shows the super-admin action only to super-admins on Admin rows", () => {
     const me = { id: "a", superAdmin: true };
     expect(canChangeSuperAdmin(me, { id: "b", roleCode: "ADMIN" })).toBe(true);
+    expect(canChangeSuperAdmin(me, { id: "b", roleCode: "ADMIN", superAdmin: true })).toBe(false);
     expect(canChangeSuperAdmin(me, { id: "a", roleCode: "ADMIN" })).toBe(true);
     expect(canChangeSuperAdmin(me, { id: "b", roleCode: "OPS" })).toBe(false);
     expect(canChangeSuperAdmin({ id: "a", superAdmin: false }, { id: "b", roleCode: "ADMIN" })).toBe(false);
+    expect(opsAccountActionErrorMessage("OPS_SUPER_ADMIN_REVOKE_FORBIDDEN")).toContain("Không thể thu hồi");
     expect(opsAccountActionErrorMessage("OPS_LAST_SUPER_ADMIN")).toContain("ít nhất một");
     expect(opsAccountActionErrorMessage("SOMETHING")).toBeNull();
   });

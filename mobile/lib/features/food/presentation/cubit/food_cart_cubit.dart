@@ -194,6 +194,7 @@ class FoodCartState {
         lines.isNotEmpty &&
         hasDropoff &&
         minOrderShortVnd == 0 &&
+        (voucherCode == null || voucherDiscountVnd > 0) &&
         dropoffLabel.length <= 160 &&
         deliveryFareVnd != null;
   }
@@ -220,11 +221,16 @@ class FoodCartState {
     String? note,
     bool? utensils,
   }) {
-    // Any change to what is being bought invalidates the quoted discount.
-    // A note-only edit leaves the lines equal, so the voucher can stay.
+    // Any basket/address change invalidates the quoted discount, but keeps the
+    // chosen code so checkout can revalidate it and explain how to recover.
+    // Explicit clear or a store switch removes it; completed orders rebuild the cart.
     final linesChanged = lines != null && !_sameLines(this.lines, lines);
-    final dropVoucher =
-        clearVoucher || clearStore || linesChanged || idempotencyKey != null;
+    final dropVoucher = clearVoucher || clearStore;
+    final invalidateVoucherQuote =
+        dropVoucher ||
+        linesChanged ||
+        clearDeliveryFare ||
+        deliveryFareVnd != null;
     // The delivery quote depends on the store; another store needs a new one.
     final storeChanged =
         clearStore || (storeId != null && storeId != this.storeId);
@@ -250,7 +256,8 @@ class FoodCartState {
       idempotencyKey: idempotencyKey ?? this.idempotencyKey,
       voucherCode: voucherCode ?? (dropVoucher ? null : this.voucherCode),
       voucherDiscountVnd:
-          voucherDiscountVnd ?? (dropVoucher ? 0 : this.voucherDiscountVnd),
+          voucherDiscountVnd ??
+          (invalidateVoucherQuote ? 0 : this.voucherDiscountVnd),
       minOrderVnd: clearStore ? 0 : minOrderVnd ?? this.minOrderVnd,
       prepMinutes: clearStore
           ? null

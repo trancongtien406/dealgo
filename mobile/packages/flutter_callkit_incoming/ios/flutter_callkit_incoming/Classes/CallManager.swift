@@ -75,17 +75,23 @@ class CallManager: NSObject {
     func connectedCall(call: Call) {
         let callItem = self.callWithUUID(uuid: call.uuid)
 
-        // Never re-answer an already-connected call. The CXAnswerCallAction
-        // requested below makes the plugin re-emit ACTION_CALL_ACCEPT to the
-        // app; if the app's accept handler calls setCallConnected again, that
-        // becomes an accept -> connect -> answer -> accept loop that freezes
-        // the call UI. Requesting another answer action for a connected call
-        // is never useful.
+        // Never re-answer an already-connected or already-accepted call. The
+        // CXAnswerCallAction requested below makes the plugin re-emit
+        // ACTION_CALL_ACCEPT to the app; if the user already answered via
+        // CallKit (isAccepted == true) or the call already connected, requesting
+        // another answer action causes a duplicate CXAnswerCallAction. Only
+        // request CXAnswerCallAction when the app answered in-app while CallKit
+        // was still ringing.
         if callItem?.hasConnected == true {
             print("connectedCall ignored: call already connected \(call.uuid.uuidString)")
             return
         }
+        let alreadyAccepted = callItem?.data.isAccepted == true
+        callItem?.data.isAccepted = true
         callItem?.connectedCall(completion: nil)
+        if alreadyAccepted {
+            return
+        }
 
         let answerAction = CXAnswerCallAction(call: call.uuid)
         let transaction = CXTransaction(action: answerAction)
@@ -119,7 +125,10 @@ class CallManager: NSObject {
                 item["accepted"] = callItem?.hasConnected
                 json.append(item)
             }else {
-                let item: [String: String] = ["id": call.uuid.uuidString]
+                let item: [String: Any] = [
+                    "id": call.uuid.uuidString,
+                    "isAccepted": call.hasConnected,
+                ]
                 json.append(item)
             }
         }

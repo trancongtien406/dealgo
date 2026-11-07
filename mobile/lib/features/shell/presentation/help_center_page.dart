@@ -283,6 +283,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
         child: DealGoPrimaryButton(
           key: const Key('help-create-ticket'),
           label: l10n.helpCreateTicket,
+          fullWidth: true,
           trailingIcon: DealGoIcons.arrowRight,
           onPressed: _createTicket,
         ),

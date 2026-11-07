@@ -3110,6 +3110,38 @@
   "securityPasskeyExists": "This device already has a passkey for your account.",
   "securityPasskeyFailed": "Could not add the passkey. Please try again.",
   "securityPasskeyNeedsVerifiedLogin": "Verify your account before adding a passkey.",
+  "securityPasskeysCount": "{count, plural, =0{Not set up} =1{1 passkey} other{{count} passkeys}}",
+  "@securityPasskeysCount": {"placeholders": {"count": {"type": "int"}}},
+  "passkeysHeader": "Passkeys",
+  "passkeysTitle": "Passkeys on your account",
+  "passkeysIntro": "A passkey lets you sign in with your fingerprint, face or screen lock instead of a code. Add one on each device you use.",
+  "passkeysAdd": "Add a passkey on this device",
+  "passkeysEmpty": "No passkey yet. Add one to sign in faster and more safely.",
+  "passkeysItemTitle": "Passkey",
+  "passkeysAddedOn": "Added {date}",
+  "@passkeysAddedOn": {"placeholders": {"date": {"type": "String"}}},
+  "passkeysSynced": "Synced across your devices",
+  "passkeysThisDeviceOnly": "Stored on one device",
+  "passkeysRemove": "Remove",
+  "passkeysRemoveTitle": "Remove this passkey?",
+  "passkeysRemoveBody": "You will no longer be able to sign in with it. Other sign-in methods stay as they are.",
+  "passkeysRemoved": "Passkey removed.",
+  "passkeysLastCredential": "This is your only sign-in method. Add a verified phone, email or another passkey first.",
+  "passkeysLoadFailed": "Could not load passkeys.",
+  "sessionsActiveNow": "Active now",
+  "sessionsLastActive": "Last active {when}",
+  "@sessionsLastActive": {"placeholders": {"when": {"type": "String"}}},
+  "sessionsSignedInAt": "Signed in {when}",
+  "@sessionsSignedInAt": {"placeholders": {"when": {"type": "String"}}},
+  "sessionsIp": "IP {ip}",
+  "@sessionsIp": {"placeholders": {"ip": {"type": "String"}}},
+  "sessionsAdminWeb": "Admin Web",
+  "sessionsUnknownDevice": "Unknown device",
+  "sessionsLogoutTitle": "Sign out this device?",
+  "sessionsLogoutBody": "It will need to sign in again. If you do not recognise it, also change your sign-in methods.",
+  "sessionsLogoutOthersTitle": "Sign out all other devices?",
+  "sessionsCount": "{count} devices signed in",
+  "@sessionsCount": {"placeholders": {"count": {"type": "int"}}},
   "merchantProfileTitle": "Store profile",
   "merchantProfileName": "Store name",
   "merchantProfileNameInvalid": "Store name must be 2 to 120 characters.",
@@ -3472,6 +3504,37 @@
   "merchantOfferSave": "Create deal",
   "merchantReviewsTitle": "Customer reviews",
   "merchantReviewsEmpty": "No reviews yet",
+  "merchantReviewsFilterNone": "No matching reviews",
+  "merchantReviewsSearch": "Search in comments or replies...",
+  "merchantReviewsFilterTitle": "Filters & Sort",
+  "merchantReviewsFilterStars": "Rating",
+  "merchantReviewsFilterReplied": "Merchant reply",
+  "merchantReviewsFilterRepliedAll": "All",
+  "merchantReviewsFilterRepliedYes": "Replied",
+  "merchantReviewsFilterRepliedNo": "Not replied",
+  "merchantReviewsFilterComment": "Comment",
+  "merchantReviewsFilterCommentAll": "All",
+  "merchantReviewsFilterCommentOnly": "With comment",
+  "merchantReviewsFilterVisibility": "Visibility",
+  "merchantReviewsFilterVisAll": "All",
+  "merchantReviewsFilterVisVisible": "Visible",
+  "merchantReviewsFilterVisHidden": "Hidden",
+  "merchantReviewsFilterTags": "Tags",
+  "merchantReviewsFilterTagAll": "All tags",
+  "merchantReviewsFilterDate": "Date range",
+  "merchantReviewsFilterDateAll": "All time",
+  "merchantReviewsFilterDateToday": "Today",
+  "merchantReviewsFilterDate7Days": "Past 7 days",
+  "merchantReviewsFilterDate30Days": "Past 30 days",
+  "merchantReviewsFilterDateCustom": "Custom range",
+  "merchantReviewsFilterSort": "Sort by",
+  "merchantReviewsFilterSortNewest": "Newest",
+  "merchantReviewsFilterSortOldest": "Oldest",
+  "merchantReviewsFilterSortLowest": "Lowest rating",
+  "merchantReviewsFilterSortHighest": "Highest rating",
+  "merchantReviewsFilterReset": "Reset",
+  "merchantReviewsFilterApply": "Apply",
+  "merchantReviewsFilterActive": "Filtered",
   "merchantReviewHidden": "Hidden",
   "merchantReviewReply": "Reply",
   "merchantReviewEditReply": "Edit reply",
@@ -4033,6 +4096,8 @@
     }
   },
   "contactPhoneDialFailed": "Couldn't open the phone app.",
+  "contactPhoneSimLabel": "Direct cellular call (SIM)",
+  "contactPhoneCallNow": "Call now",
   "kycReviewAvatar": "Profile photo",
   "kycAvatarMissing": "Required before you submit. Customers see this photo when you take their job.",
   "kycAvatarReady": "Customers see this photo when you take their job.",
@@ -4067,8 +4132,7 @@
   "driverFareFixed": "This order uses a fixed fee: you can only accept the customer's price.",
   "foodFareDecrease": "Lower the fee",
   "foodFareIncrease": "Raise the fee",
-  "foodFareReset": "Use the suggestion",
-  "foodFareNegotiationTitle": "Delivery fee",
+   "foodFareNegotiationTitle": "Delivery fee",
   "foodFareWaiting": "Waiting for a driver to accept {amount}",
   "@foodFareWaiting": {
     "placeholders": {
@@ -4224,6 +4288,167 @@
       },
       "total": {
         "type": "String"
+      }
+    }
+  },
+  "merchantItemPhotoCount": "{count}/{max} photos",
+  "@merchantItemPhotoCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantItemPhotoLimitError": "Up to {max} photos per item.",
+  "@merchantItemPhotoLimitError": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantItemPhotoHint": "First photo is the cover. Added or removed photos are saved with the form.",
+  "merchantItemPhotoCover": "Cover",
+  "merchantItemPhotoNew": "New",
+  "merchantItemPhotoEmpty": "No photo",
+  "merchantItemPhotoCamera": "Take photo",
+  "merchantItemCategoryNone": "Uncategorized",
+  "merchantItemCategoryCreateTitle": "New category",
+  "merchantItemPricingSection": "Pricing & Promotion",
+  "merchantItemPrepSection": "Preparation & Visibility",
+  "merchantItemPrepMinutesChip": "{minutes} min",
+  "@merchantItemPrepMinutesChip": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantItemPrepClear": "Clear",
+  "merchantItemOptionsGroupCount": "{count} groups",
+  "@merchantItemOptionsGroupCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantItemOptionsChoicesCount": "Choices ({count})",
+  "@merchantItemOptionsChoicesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantItemOptionsDefaultChoice": "Default",
+  "merchantItemDeleteAction": "Delete item",
+  "merchantItemDeleteConfirmTitle": "Delete item?",
+  "merchantItemDeleteConfirmBody": "\"{name}\" will be removed from the menu.",
+  "@merchantItemDeleteConfirmBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "merchantItemDeleted": "Item deleted",
+  "merchantProductsAllCategories": "All categories",
+  "merchantProductsCount": "{shown}/{total} items",
+  "@merchantProductsCount": {
+    "placeholders": {
+      "shown": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantStatsRange14": "14 days",
+  "merchantStatsMetricOrders": "Orders",
+  "merchantStatsMetricRevenue": "Revenue",
+  "merchantStatsAvgOrderValue": "Avg. order value",
+  "merchantStatsCompletionRate": "Completion rate",
+  "merchantStatsCancelledOrders": "Cancelled",
+  "merchantStatsDailyAvgSales": "Avg. daily sales",
+  "merchantStatsPeakDay": "Peak day",
+  "merchantStatsSelectedDay": "Date {date}",
+  "@merchantStatsSelectedDay": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "merchantStatsTapBarHint": "Tap a bar to inspect daily details",
+  "merchantStatsItemShare": "{percent}% of portions sold",
+  "@merchantStatsItemShare": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantStatsQuickHistory": "Order history",
+  "merchantStatsQuickOffers": "Store offers",
+  "merchantStatsQuickReviews": "Reply to reviews",
+  "merchantStatsStatementHistoryBtn": "View {count} settlements",
+  "@merchantStatsStatementHistoryBtn": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantStatsStatementHistoryTitle": "Settlement history",
+  "merchantStatsMenuStatus": "Menu status",
+  "merchantStatsMenuItemsCount": "{available}/{total} items on sale",
+  "@merchantStatsMenuItemsCount": {
+    "placeholders": {
+      "available": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantStatsDayDetailTitle": "Details for {date}",
+  "@merchantStatsDayDetailTitle": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "merchantStatsNetShare": "Net kept ({percent}%)",
+  "@merchantStatsNetShare": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantStatsCommissionShare": "Commission ({percent}%)",
+  "@merchantStatsCommissionShare": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "merchantStatsDayRow": "{delivered} delivered · {cancelled} cancelled",
+  "@merchantStatsDayRow": {
+    "placeholders": {
+      "delivered": {
+        "type": "int"
+      },
+      "cancelled": {
+        "type": "int"
       }
     }
   }

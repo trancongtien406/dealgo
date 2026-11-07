@@ -1,0 +1,64 @@
+<svg width="240" height="320" viewBox="0 0 240 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Definitions -->
+  <defs>
+    <!-- Pickup Gradient -->
+    <linearGradient id="pickupGrad" x1="120" y1="70" x2="120" y2="280" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#10B981"/>
+      <stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+    <!-- Chip Gradient -->
+    <linearGradient id="chipGrad" x1="120" y1="10" x2="120" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#059669"/>
+      <stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+    <!-- Drop Shadow Filter -->
+    <filter id="markerShadow" x="30" y="50" width="180" height="270" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="12" stdDeviation="10" flood-color="#091E14" flood-opacity="0.35"/>
+      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#091E14" flood-opacity="0.2"/>
+    </filter>
+    <filter id="chipShadow" x="40" y="4" width="160" height="66" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+    <radialGradient id="groundHalo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#10B981" stop-opacity="0.5"/>
+      <stop offset="60%" stop-color="#10B981" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#10B981" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Ground Halo & Contact Shadow -->
+  <ellipse cx="120" cy="298" rx="60" ry="18" fill="url(#groundHalo)"/>
+  <ellipse cx="120" cy="298" rx="36" ry="10" fill="#091E14" fill-opacity="0.32"/>
+  <ellipse cx="120" cy="298" rx="16" ry="4.5" fill="#047857" fill-opacity="0.6"/>
+
+  <!-- Top Pill Label ("ĐÓN") -->
+  <g filter="url(#chipShadow)">
+    <rect x="66" y="10" width="108" height="44" rx="22" fill="url(#chipGrad)" stroke="#FFFFFF" stroke-width="3"/>
+    <text x="120" y="38" text-anchor="middle" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="20" font-weight="800" letter-spacing="1.5">ĐÓN</text>
+  </g>
+
+  <!-- Main Marker Pin -->
+  <g filter="url(#markerShadow)">
+    <!-- Outer White Border -->
+    <path d="M120 292C120 292 200 200 200 138C200 93.8172 164.183 58 120 58C75.8172 58 40 93.8172 40 138C40 200 120 292 120 292Z" fill="#FFFFFF"/>
+    
+    <!-- Inner Gradient Body -->
+    <path d="M120 282C120 282 192 195 192 138C192 98.2355 159.765 66 120 66C80.2355 66 48 98.2355 48 138C48 195 120 282 120 282Z" fill="url(#pickupGrad)"/>
+    
+    <!-- Top Specular Highlight -->
+    <path d="M120 70C152 70 178 90 182 120C170 85 142 75 120 75C98 75 70 85 58 120C62 90 88 70 120 70Z" fill="#FFFFFF" fill-opacity="0.25"/>
+
+    <!-- Center White Disc -->
+    <circle cx="120" cy="136" r="42" fill="#FFFFFF"/>
+    <circle cx="120" cy="136" r="42" stroke="#E2E8F0" stroke-width="1.5"/>
+
+    <!-- Center Pickup Icon (Person / Passenger) -->
+    <!-- Head -->
+    <circle cx="120" cy="120" r="11" fill="#047857"/>
+    <!-- Body / Shoulders -->
+    <path d="M101 155C101 144.507 109.507 136 120 136C130.493 136 139 144.507 139 155C139 156.5 138 158 136 158H104C102 158 101 156.5 101 155Z" fill="#047857"/>
+  </g>
+
+  <!-- Pinpoint tip shine -->
+  <circle cx="120" cy="286" r="3" fill="#FFFFFF" fill-opacity="0.8"/>
+</svg>

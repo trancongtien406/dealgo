@@ -193,6 +193,44 @@ class MerchantReviews {
   bool get hasMore => page * 20 < total;
 }
 
+enum MerchantReviewReplyFilter {
+  all,
+  replied,
+  unreplied;
+
+  String? get wire => switch (this) {
+    MerchantReviewReplyFilter.all => null,
+    MerchantReviewReplyFilter.replied => 'REPLIED',
+    MerchantReviewReplyFilter.unreplied => 'UNREPLIED',
+  };
+}
+
+enum MerchantReviewVisibilityFilter {
+  all,
+  visible,
+  hidden;
+
+  String? get wire => switch (this) {
+    MerchantReviewVisibilityFilter.all => null,
+    MerchantReviewVisibilityFilter.visible => 'VISIBLE',
+    MerchantReviewVisibilityFilter.hidden => 'HIDDEN',
+  };
+}
+
+enum MerchantReviewSort {
+  newest,
+  oldest,
+  lowestStars,
+  highestStars;
+
+  String get wire => switch (this) {
+    MerchantReviewSort.newest => 'NEWEST',
+    MerchantReviewSort.oldest => 'OLDEST',
+    MerchantReviewSort.lowestStars => 'LOWEST_STARS',
+    MerchantReviewSort.highestStars => 'HIGHEST_STARS',
+  };
+}
+
 abstract interface class RatingRepository {
   Future<StoreReviews> storeReviews({
     required String accessToken,
@@ -204,6 +242,16 @@ abstract interface class RatingRepository {
   Future<MerchantReviews> merchantReviews({
     required String accessToken,
     int page = 1,
+    int? stars,
+    MerchantReviewReplyFilter replied = MerchantReviewReplyFilter.all,
+    bool? hasComment,
+    MerchantReviewVisibilityFilter visibility =
+        MerchantReviewVisibilityFilter.all,
+    RatingTag? tag,
+    String? q,
+    DateTime? from,
+    DateTime? to,
+    MerchantReviewSort sort = MerchantReviewSort.newest,
   });
 
   /// Empty [text] clears the reply.

@@ -168,22 +168,6 @@ class _StoreLocationCard extends StatelessWidget {
   }
 }
 
-/// Positive tags repeated in the loaded reviews, most mentioned first.
-List<(RatingTag, int)> _praisedTags(StoreReviews? reviews) {
-  if (reviews == null) return const [];
-  final counts = <RatingTag, int>{};
-  for (final review in reviews.items) {
-    for (final tag in review.tags) {
-      if (tag.positive) counts[tag] = (counts[tag] ?? 0) + 1;
-    }
-  }
-  final ranked = [
-    for (final entry in counts.entries)
-      if (entry.value >= 2) (entry.key, entry.value),
-  ]..sort((a, b) => b.$2.compareTo(a.$2));
-  return ranked.take(3).toList(growable: false);
-}
-
 /// The store's live offers as voucher tickets: a swipeable strip, and
 /// "Xem tất cả" for the full list in a sheet. "Dùng" attaches the code to
 /// this store's cart; checkout prices it again.

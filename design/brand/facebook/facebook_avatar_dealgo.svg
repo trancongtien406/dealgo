@@ -1,0 +1,55 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" width="2048" height="2048" viewBox="0 0 2048 2048">
+  <defs>
+    <!-- Premium radial and linear purple gradients -->
+    <radialGradient id="avatar-glow" cx="50%" cy="45%" r="65%">
+      <stop offset="0%" stop-color="#8B5CF6"/>
+      <stop offset="50%" stop-color="#6D28D9"/>
+      <stop offset="100%" stop-color="#3B0764"/>
+    </radialGradient>
+    <linearGradient id="dealgo-green" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22C55E"/>
+      <stop offset="100%" stop-color="#16A34A"/>
+    </linearGradient>
+    <filter id="mark-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="24" stdDeviation="32" flood-color="#1E0A3C" flood-opacity="0.45"/>
+    </filter>
+    <filter id="ambient-ring" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="60"/>
+    </filter>
+  </defs>
+
+  <!-- Full background -->
+  <rect width="2048" height="2048" fill="url(#avatar-glow)"/>
+
+  <!-- Subtle ambient glow circle behind the mark -->
+  <circle cx="1024" cy="1024" r="680" fill="#9333EA" opacity="0.35" filter="url(#ambient-ring)"/>
+
+  <!-- Subtle circular border guide representing high-end finish -->
+  <circle cx="1024" cy="1024" r="940" fill="none" stroke="#A78BFA" stroke-width="3" opacity="0.25"/>
+
+  <!-- DealGo Brand Mark scaled and centered at (1024, 1024) -->
+  <!-- Raw mark bounding box in dealgo-logo.svg is roughly x:145..832 (width ~687), y:278..746 (height ~468), center is (488, 512) -->
+  <!-- Target scale ~ 2.15 to make it ~1470px wide, 1000px high -->
+  <g filter="url(#mark-shadow)" transform="translate(1024, 1024) scale(2.05) translate(-488, -512)">
+    <!-- Motion D white outline -->
+    <path d="M320 278h226c171 0 286 96 286 234S717 746 546 746H320" fill="none" stroke="#ffffff" stroke-width="112" stroke-linecap="round"/>
+    <!-- Speed trails -->
+    <path d="M173 364h224M145 512h205M190 660h190" fill="none" stroke="#ffffff" stroke-width="78" stroke-linecap="round"/>
+    <!-- Green route connection white backing -->
+    <path d="m414 662 166-145-144-132" fill="none" stroke="#ffffff" stroke-width="100" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Green route connection -->
+    <path d="m414 662 166-145-144-132" fill="none" stroke="url(#dealgo-green)" stroke-width="56" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Nodes with white border and core -->
+    <g fill="url(#dealgo-green)" stroke="#ffffff" stroke-width="24">
+      <circle cx="414" cy="662" r="68"/>
+      <circle cx="580" cy="517" r="68"/>
+      <circle cx="436" cy="385" r="68"/>
+    </g>
+    <g fill="#ffffff">
+      <circle cx="414" cy="662" r="19"/>
+      <circle cx="580" cy="517" r="19"/>
+      <circle cx="436" cy="385" r="19"/>
+    </g>
+  </g>
+</svg>

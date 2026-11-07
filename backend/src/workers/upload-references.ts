@@ -73,6 +73,13 @@ export class PrismaUploadReferences implements UploadReferenceSource {
         FROM "food_items" i
        WHERE i."imageUrl" LIKE ${`${menuPrefix}%`}
       UNION
+      SELECT 'menu-items/' || substr(u.url, ${menuPrefix.length + 1}::int) AS key
+        FROM "food_items" i,
+             jsonb_array_elements_text(
+               CASE WHEN jsonb_typeof(i."imageUrls") = 'array' THEN i."imageUrls" ELSE '[]'::jsonb END
+             ) AS u(url)
+       WHERE u.url LIKE ${`${menuPrefix}%`}
+      UNION
       SELECT 'store-logos/' || substr(s."logoUrl", ${logoPrefix.length + 1}::int) AS key
         FROM "food_stores" s
        WHERE s."logoUrl" LIKE ${`${logoPrefix}%`}

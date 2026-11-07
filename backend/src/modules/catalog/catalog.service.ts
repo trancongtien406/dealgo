@@ -14,25 +14,82 @@ import type {
 } from '../food-order/food.repository.js';
 import { FoodService } from '../food-order/food.service.js';
 import { opsDateWindow } from '../operations/ops-date-window.js';
+import { MenuItemImageService } from './menu-item-image.service.js';
 
 @Injectable()
 export class CatalogService {
-  constructor(private readonly food: FoodService) {}
+  constructor(
+    private readonly food: FoodService,
+    private readonly itemImages: MenuItemImageService,
+  ) {}
 
   getMerchantCatalog(actor: RequestActor): Promise<StoreDetail> {
     return this.food.getMerchantCatalog(actor);
   }
 
-  createItem(actor: RequestActor, dto: CreateFoodItemDto): Promise<StoreItemView> {
-    return this.food.createItem(actor, dto);
+  async createItem(
+    actor: RequestActor,
+    dto: CreateFoodItemDto,
+  ): Promise<StoreItemView> {
+    const created = await this.food.createItem(actor, dto);
+    if (dto.newImages && dto.newImages.length > 0) {
+      return this.itemImages.syncFormImages(actor, created, {
+        newImages: dto.newImages,
+      });
+    }
+    return created;
   }
 
-  updateItem(
+  async updateItem(
     actor: RequestActor,
     itemId: string,
     dto: UpdateFoodItemDto,
   ): Promise<StoreItemView> {
-    return this.food.updateItem(actor, itemId, dto);
+    const hasImageChanges =
+      dto.imageUrls !== undefined ||
+      dto.imageUrl === null ||
+      (dto.newImages !== undefined && dto.newImages.length > 0);
+    if (!hasImageChanges) {
+      return this.food.updateItem(actor, itemId, dto);
+    }
+    // Load existing item before updating so we know which old images were removed.
+    const catalog = await this.food.getMerchantCatalog(actor);
+    const existing = catalog.items.find((row) => row.id === itemId);
+    const { imageUrls, newImages, imageUrl, ...fieldDto } = dto;
+    const hasFieldUpdates =
+      fieldDto.name !== undefined ||
+      fieldDto.priceVnd !== undefined ||
+      fieldDto.originalPriceVnd !== undefined ||
+      fieldDto.available !== undefined ||
+      fieldDto.description !== undefined ||
+      fieldDto.prepMinutes !== undefined ||
+      fieldDto.menuCategoryId !== undefined ||
+      fieldDto.optionGroups !== undefined ||
+      (imageUrl !== undefined && imageUrl !== null && imageUrls === undefined);
+
+    let current = existing;
+    if (hasFieldUpdates || !current) {
+      current = await this.food.updateItem(actor, itemId, {
+        ...fieldDto,
+        ...(imageUrl !== undefined && imageUrl !== null && imageUrls === undefined
+          ? { imageUrl }
+          : {}),
+      });
+    }
+    return this.itemImages.syncFormImages(actor, current, {
+      keptImageUrls: imageUrls,
+      clearAll: imageUrl === null && imageUrls === undefined,
+      newImages,
+    });
+  }
+
+  async deleteItem(
+    actor: RequestActor,
+    itemId: string,
+  ): Promise<{ deleted: true; id: string }> {
+    const res = await this.food.deleteItem(actor, itemId);
+    await this.itemImages.discardUrls(res.imageUrls);
+    return { deleted: true, id: res.id };
   }
 
   replaceItemOptions(

@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/design_system/components/dealgo_card.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
@@ -40,7 +44,9 @@ class ParcelDetailsPage extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(title: Text(l10n.parcelDetailsTitle)),
-      body: SafeArea(child: ParcelDetailsPanel(places: places)),
+      body: SafeArea(
+        child: ParcelDetailsPanel(places: places, showTitle: false),
+      ),
     );
   }
 }
@@ -53,12 +59,14 @@ class ParcelDetailsPanel extends StatelessWidget {
     required this.places,
     this.scrollController,
     this.onEditRoute,
+    this.showTitle = true,
     super.key,
   });
 
   final RidePlaces places;
   final ScrollController? scrollController;
   final VoidCallback? onEditRoute;
+  final bool showTitle;
 
   @override
   Widget build(BuildContext context) {
@@ -71,6 +79,7 @@ class ParcelDetailsPanel extends StatelessWidget {
         places: places,
         scrollController: scrollController,
         onEditRoute: onEditRoute,
+        showTitle: showTitle,
       ),
     );
   }
@@ -81,11 +90,13 @@ class _ParcelDetailsView extends StatefulWidget {
     required this.places,
     this.scrollController,
     this.onEditRoute,
+    this.showTitle = true,
   });
 
   final RidePlaces places;
   final ScrollController? scrollController;
   final VoidCallback? onEditRoute;
+  final bool showTitle;
 
   @override
   State<_ParcelDetailsView> createState() => _ParcelDetailsViewState();
@@ -103,12 +114,72 @@ class _ParcelDetailsViewState extends State<_ParcelDetailsView> {
   var _method = 'CASH';
   ParcelPhoto? _photo;
   var _editSender = false;
+  var _moreDetails = false;
+  final _moreDetailsKey = GlobalKey();
+  final _weightKey = GlobalKey();
+  final _noteKey = GlobalKey();
+  final _weightFocus = FocusNode();
+  final _noteFocus = FocusNode();
+  Timer? _scrollTimer;
+
+  void _toggleMoreDetails() {
+    setState(() => _moreDetails = !_moreDetails);
+    if (_moreDetails) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final ctx = _moreDetailsKey.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(
+            ctx,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
+            alignment: 0.1,
+          );
+        }
+      });
+    }
+  }
+
+  double _lastKeyboard = 0;
+
+  void _onWeightFocus() {
+    if (_weightFocus.hasFocus) {
+      _scrollToField(_weightKey);
+    }
+  }
+
+  void _onNoteFocus() {
+    if (_noteFocus.hasFocus) {
+      _scrollToField(_noteKey);
+    }
+  }
+
+  void _scrollToField(GlobalKey key) {
+    void scroll() {
+      if (!mounted) return;
+      final ctx = key.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+        );
+      }
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => scroll());
+    _scrollTimer?.cancel();
+    _scrollTimer = Timer(const Duration(milliseconds: 280), scroll);
+  }
 
   @override
   void initState() {
     super.initState();
     _prefillSender();
     _weight.addListener(_weightChanged);
+    _weightFocus.addListener(_onWeightFocus);
+    _noteFocus.addListener(_onNoteFocus);
   }
 
   /// Sender = the signed-in customer (editable, rarely changed).
@@ -161,6 +232,11 @@ class _ParcelDetailsViewState extends State<_ParcelDetailsView> {
 
   @override
   void dispose() {
+    _scrollTimer?.cancel();
+    _weightFocus.removeListener(_onWeightFocus);
+    _noteFocus.removeListener(_onNoteFocus);
+    _weightFocus.dispose();
+    _noteFocus.dispose();
     for (final c in [
       _weight,
       _note,
@@ -241,60 +317,75 @@ class _ParcelDetailsViewState extends State<_ParcelDetailsView> {
     final option = state.option;
     final cubit = context.read<ParcelBookingCubit>();
     const gap = SizedBox(height: DealGoSpacing.s12);
-    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
-    return Form(
-      key: _form,
-      // ListTiles/ExpansionTile need a Material ancestor for ink.
-      child: Material(
-        type: MaterialType.transparency,
-        child: Column(
-          children: [
-            // Fixed sheet header: content scrolls under it, never under the
-            // rounded sheet edge.
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                DealGoSpacing.s16,
-                DealGoSpacing.s12,
-                DealGoSpacing.s8,
-                DealGoSpacing.s4,
-              ),
-              child: Column(
-                children: [
-                  const SizedBox(height: DealGoSpacing.s8),
-                  Row(
+    final keyboardBottom = MediaQuery.viewInsetsOf(context).bottom;
+    if (keyboardBottom > 0 && _lastKeyboard == 0) {
+      if (_weightFocus.hasFocus) {
+        _scrollToField(_weightKey);
+      } else if (_noteFocus.hasFocus) {
+        _scrollToField(_noteKey);
+      }
+    }
+    _lastKeyboard = keyboardBottom;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: keyboardBottom),
+      child: Form(
+        key: _form,
+        // ListTiles/ExpansionTile need a Material ancestor for ink.
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(
+            children: [
+              // Fixed sheet header: content scrolls under it, never under the
+              // rounded sheet edge.
+              if (widget.showTitle || widget.onEditRoute != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    DealGoSpacing.s16,
+                    DealGoSpacing.s12,
+                    DealGoSpacing.s8,
+                    DealGoSpacing.s4,
+                  ),
+                  child: Column(
                     children: [
-                      Expanded(
-                        child: Text(
-                          l10n.parcelDetailsTitle,
-                          key: const Key('parcel-sheet-title'),
-                          style: text.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
+                      const SizedBox(height: DealGoSpacing.s8),
+                      Row(
+                        children: [
+                          if (widget.showTitle)
+                            Expanded(
+                              child: Text(
+                                l10n.parcelDetailsTitle,
+                                key: const Key('parcel-sheet-title'),
+                                style: text.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            )
+                          else
+                            const Spacer(),
+                          if (widget.onEditRoute != null)
+                            TextButton(
+                              key: const Key('parcel-edit-route'),
+                              onPressed: widget.onEditRoute,
+                              child: Text(l10n.parcelEditRoute),
+                            ),
+                        ],
                       ),
-                      if (widget.onEditRoute != null)
-                        TextButton(
-                          key: const Key('parcel-edit-route'),
-                          onPressed: widget.onEditRoute,
-                          child: Text(l10n.parcelEditRoute),
-                        ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            Divider(height: 1, color: DealGoColors.divider),
-            Expanded(
-              child: ListView(
-                controller: widget.scrollController,
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: EdgeInsets.fromLTRB(
-                  DealGoSpacing.s16,
-                  DealGoSpacing.s16,
-                  DealGoSpacing.s16,
-                  DealGoSpacing.s24 + keyboard,
                 ),
+              Divider(height: 1, color: DealGoColors.divider),
+              Expanded(
+                child: ListView(
+                  controller: widget.scrollController,
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.manual,
+                  padding: const EdgeInsets.fromLTRB(
+                    DealGoSpacing.s16,
+                    DealGoSpacing.s16,
+                    DealGoSpacing.s16,
+                    DealGoSpacing.s24,
+                  ),
                 children: [
                   // Route + trip summary (server distance/time).
                   _RouteCard(
@@ -428,9 +519,12 @@ class _ParcelDetailsViewState extends State<_ParcelDetailsView> {
                     icon: DealGoIcons.userRound,
                     title: l10n.parcelRecipientTitle,
                   ),
-                  TextFormField(
-                    key: const Key('parcel-recipient-phone'),
+                  DealGoTextField(
+                    fieldKey: const Key('parcel-recipient-phone'),
                     controller: _recipientPhone,
+                    label: l10n.parcelPhoneLabel,
+                    hint: l10n.parcelPhoneHint,
+                    prefixIcon: DealGoIcons.phone,
                     keyboardType: TextInputType.phone,
                     textInputAction: TextInputAction.next,
                     autofillHints: const [AutofillHints.telephoneNumber],
@@ -438,32 +532,25 @@ class _ParcelDetailsViewState extends State<_ParcelDetailsView> {
                       FilteringTextInputFormatter.allow(RegExp(r'[0-9+ ]')),
                       LengthLimitingTextInputFormatter(13),
                     ],
-                    decoration: InputDecoration(
-                      labelText: l10n.parcelPhoneLabel,
-                      hintText: l10n.parcelPhoneHint,
-                      prefixIcon: const Icon(DealGoIcons.phone, size: 20),
-                      suffixIcon: IconButton(
-                        key: const Key('parcel-pick-contact'),
-                        tooltip: l10n.parcelPickContact,
-                        icon: const Icon(
-                          Icons.contacts_outlined,
-                          color: DealGoColors.primary,
-                        ),
-                        onPressed: _pickRecipient,
+                    suffix: IconButton(
+                      key: const Key('parcel-pick-contact'),
+                      tooltip: l10n.parcelPickContact,
+                      icon: const Icon(
+                        Icons.contacts_outlined,
+                        color: DealGoColors.primary,
                       ),
+                      onPressed: _pickRecipient,
                     ),
                     validator: _phone,
                   ),
                   gap,
-                  TextFormField(
-                    key: const Key('parcel-recipient-name'),
+                  DealGoTextField(
+                    fieldKey: const Key('parcel-recipient-name'),
                     controller: _recipientName,
+                    label: l10n.parcelNameLabel,
+                    prefixIcon: DealGoIcons.user,
                     textCapitalization: TextCapitalization.words,
                     textInputAction: TextInputAction.done,
-                    decoration: InputDecoration(
-                      labelText: l10n.parcelNameLabel,
-                      prefixIcon: const Icon(DealGoIcons.user, size: 20),
-                    ),
                     validator: _required,
                   ),
 
@@ -473,30 +560,26 @@ class _ParcelDetailsViewState extends State<_ParcelDetailsView> {
                     title: l10n.parcelSenderTitle,
                   ),
                   if (_editSender) ...[
-                    TextFormField(
-                      key: const Key('parcel-sender-name'),
+                    DealGoTextField(
+                      fieldKey: const Key('parcel-sender-name'),
                       controller: _senderName,
+                      label: l10n.parcelNameLabel,
+                      prefixIcon: DealGoIcons.user,
                       textCapitalization: TextCapitalization.words,
-                      decoration: InputDecoration(
-                        labelText: l10n.parcelNameLabel,
-                        prefixIcon: const Icon(DealGoIcons.user, size: 20),
-                      ),
                       validator: _required,
                     ),
                     gap,
-                    TextFormField(
-                      key: const Key('parcel-sender-phone'),
+                    DealGoTextField(
+                      fieldKey: const Key('parcel-sender-phone'),
                       controller: _senderPhone,
+                      label: l10n.parcelPhoneLabel,
+                      hint: l10n.parcelPhoneHint,
+                      prefixIcon: DealGoIcons.phone,
                       keyboardType: TextInputType.phone,
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(RegExp(r'[0-9+ ]')),
                         LengthLimitingTextInputFormatter(13),
                       ],
-                      decoration: InputDecoration(
-                        labelText: l10n.parcelPhoneLabel,
-                        hintText: l10n.parcelPhoneHint,
-                        prefixIcon: const Icon(DealGoIcons.phone, size: 20),
-                      ),
                       validator: _phone,
                     ),
                   ] else
@@ -564,67 +647,124 @@ class _ParcelDetailsViewState extends State<_ParcelDetailsView> {
                     ),
                   ],
                   gap,
-                  Theme(
-                    data: Theme.of(context)
-                        .copyWith(dividerColor: Colors.transparent),
-                    child: ExpansionTile(
-                      key: const Key('parcel-more'),
-                      tilePadding: EdgeInsets.zero,
-                      childrenPadding: const EdgeInsets.only(
-                        bottom: DealGoSpacing.s12,
-                      ),
-                      title: Text(
-                        l10n.parcelMoreDetails,
-                        style: text.titleSmall?.copyWith(
-                          color: DealGoColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                  gap,
+                  DealGoCard(
+                    key: _moreDetailsKey,
+                    padding: EdgeInsets.zero,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        TextFormField(
-                          key: const Key('parcel-weight'),
-                          controller: _weight,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
+                        InkWell(
+                          key: const Key('parcel-more'),
+                          onTap: _toggleMoreDetails,
+                          borderRadius: BorderRadius.circular(DealGoRadius.card),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: DealGoSpacing.s16,
+                              vertical: DealGoSpacing.s12,
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  DealGoIcons.note,
+                                  size: 20,
+                                  color: DealGoColors.primary,
+                                ),
+                                const SizedBox(width: DealGoSpacing.s12),
+                                Expanded(
+                                  child: Text(
+                                    l10n.parcelMoreDetails,
+                                    style: text.titleSmall?.copyWith(
+                                      color: DealGoColors.primary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                Icon(
+                                  _moreDetails
+                                      ? DealGoIcons.expandLess
+                                      : DealGoIcons.expandMore,
+                                  color: DealGoColors.textSecondary,
+                                  size: 20,
+                                ),
+                              ],
+                            ),
                           ),
-                          decoration: InputDecoration(
-                            labelText: l10n.parcelWeightLabel,
-                            suffixText: 'kg',
+                        ),
+                        if (_moreDetails) ...[
+                          Divider(height: 1, color: DealGoColors.divider),
+                          Padding(
+                            padding: const EdgeInsets.all(DealGoSpacing.s16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                DealGoTextField(
+                                  key: _weightKey,
+                                  fieldKey: const Key('parcel-weight'),
+                                  controller: _weight,
+                                  focusNode: _weightFocus,
+                                  label: l10n.parcelWeightLabel,
+                                  hint: '0.0',
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                                  suffix: Padding(
+                                    padding: const EdgeInsets.only(
+                                      right: 12,
+                                      top: 12,
+                                    ),
+                                    child: Text(
+                                      'kg',
+                                      style: text.bodyMedium?.copyWith(
+                                        color: DealGoColors.textSecondary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  validator: (v) {
+                                    if ((v ?? '').trim().isEmpty ||
+                                        size == null) {
+                                      return null;
+                                    }
+                                    final w = _weightKg;
+                                    if (w == null || w <= 0) {
+                                      return l10n.parcelWeightInvalid;
+                                    }
+                                    final limit =
+                                        parcelWeightOverLimit(size, w);
+                                    return limit == null
+                                        ? null
+                                        : l10n.parcelWeightOver(
+                                            limit.toStringAsFixed(0),
+                                          );
+                                    },
+                                ),
+                                gap,
+                                DealGoTextField(
+                                  key: _noteKey,
+                                  fieldKey: const Key('parcel-note'),
+                                  controller: _note,
+                                  focusNode: _noteFocus,
+                                  label: l10n.parcelNoteLabel,
+                                  hint: l10n.parcelNoteLabel,
+                                  maxLength: 300,
+                                  maxLines: 3,
+                                  textCapitalization:
+                                      TextCapitalization.sentences,
+                                ),
+                                const SizedBox(height: DealGoSpacing.s8),
+                                DealGoSecondaryButton(
+                                  key: const Key('parcel-item-photo'),
+                                  label: _photo == null
+                                      ? l10n.parcelItemPhotoAdd
+                                      : l10n.parcelItemPhotoAdded,
+                                  onPressed: _pickPhoto,
+                                ),
+                              ],
+                            ),
                           ),
-                          validator: (v) {
-                            if ((v ?? '').trim().isEmpty || size == null) {
-                              return null;
-                            }
-                            final w = _weightKg;
-                            if (w == null || w <= 0) {
-                              return l10n.parcelWeightInvalid;
-                            }
-                            final limit = parcelWeightOverLimit(size, w);
-                            return limit == null
-                                ? null
-                                : l10n.parcelWeightOver(
-                                    limit.toStringAsFixed(0),
-                                  );
-                          },
-                        ),
-                        gap,
-                        TextFormField(
-                          key: const Key('parcel-note'),
-                          controller: _note,
-                          maxLength: 300,
-                          minLines: 1,
-                          maxLines: 3,
-                          decoration: InputDecoration(
-                            labelText: l10n.parcelNoteLabel,
-                          ),
-                        ),
-                        DealGoSecondaryButton(
-                          key: const Key('parcel-item-photo'),
-                          label: _photo == null
-                              ? l10n.parcelItemPhotoAdd
-                              : l10n.parcelItemPhotoAdded,
-                          onPressed: _pickPhoto,
-                        ),
+                        ],
                       ],
                     ),
                   ),
@@ -677,7 +817,8 @@ class _ParcelDetailsViewState extends State<_ParcelDetailsView> {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 }
 

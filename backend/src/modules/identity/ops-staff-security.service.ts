@@ -54,6 +54,10 @@ export class OpsStaffSecurityService {
     if (!actor?.superAdmin) {
       throw authError(403, 'OPS_SUPER_ADMIN_REQUIRED', 'Only a super-admin can assign staff roles');
     }
+    const target = await this.repository.findOpsCredential(input.targetUserId);
+    if (target?.superAdmin) {
+      throw authError(400, 'OPS_SUPER_ADMIN_ROLE_CHANGE_FORBIDDEN', 'Cannot change role of super-admin');
+    }
     const grants = await this.repository.listGrants(input.targetUserId);
     if (!grants.some((grant) => grant.role === 'OPS')) {
       throw authError(404, 'OPS_STAFF_NOT_FOUND', 'Ops staff member not found');
@@ -101,13 +105,16 @@ export class OpsStaffSecurityService {
     return { userId: input.targetUserId, sessionsRevoked: true };
   }
 
-  /** Minimal super-admin management: grant/revoke the flag; never the last one; audited. */
+  /** Minimal super-admin management: grant the flag; super-admin cannot be revoked; audited. */
   async setSuperAdmin(input: {
     actorUserId: string;
     targetUserId: string;
     superAdmin: boolean;
     reason: string;
   }): Promise<{ userId: string; superAdmin: boolean }> {
+    if (!input.superAdmin) {
+      throw authError(400, 'OPS_SUPER_ADMIN_REVOKE_FORBIDDEN', 'Super-admin cannot be revoked');
+    }
     const actor = await this.repository.findOpsCredential(input.actorUserId);
     if (!actor?.superAdmin) {
       throw authError(403, 'OPS_SUPER_ADMIN_REQUIRED', 'Only a super-admin can change super-admins');

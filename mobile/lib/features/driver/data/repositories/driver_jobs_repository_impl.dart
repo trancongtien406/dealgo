@@ -17,6 +17,14 @@ class DriverJobsRepositoryImpl implements DriverJobsRepository {
   }
 
   @override
+  Future<void> dismissRide({
+    required String accessToken,
+    required String rideId,
+  }) {
+    return _remote.dismissRide(accessToken: accessToken, rideId: rideId);
+  }
+
+  @override
   Future<List<ReadyFoodJob>> listReadyOrders(String accessToken) {
     return _remote.listReadyOrders(accessToken);
   }

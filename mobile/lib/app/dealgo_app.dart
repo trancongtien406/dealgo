@@ -1,3 +1,5 @@
+import '../features/account_settings/presentation/session_device.dart';
+
 import 'dart:developer' as developer;
 
 import '../core/appearance/app_appearance.dart';
@@ -241,6 +243,13 @@ class _DealGoAppState extends State<DealGoApp> with WidgetsBindingObserver {
       // background so a slow platform store never delays sign-out.
       unawaited(PlaceHistoryCache.clear());
       unawaited(_deps.activeJobs.clear());
+      if (token.isNotEmpty) {
+        try {
+          await _deps.presenceRepository
+              .setPresence(accessToken: token, online: false)
+              .timeout(const Duration(seconds: 2));
+        } catch (_) {}
+      }
       await _deps.voiceCallCubit.signOut();
       await _deps.push.unregister(accessToken: token);
     };
@@ -332,9 +341,11 @@ class _DealGoAppState extends State<DealGoApp> with WidgetsBindingObserver {
         _maybePromptRuntimePermissions();
         unawaited(_deps.analytics.setUserId(state.profile.id));
         setCrashReportingUser(state.profile.id);
+        unawaited(_syncDeviceSession(state.tokens.accessToken));
       } else {
         if (state is AuthSignedOut) {
           unawaited(_deps.voiceCallCubit.signOut());
+          unawaited(_deps.push.unregister(accessToken: ''));
         }
         unawaited(_deps.analytics.setUserId(null));
         setCrashReportingUser(null);
@@ -347,6 +358,18 @@ class _DealGoAppState extends State<DealGoApp> with WidgetsBindingObserver {
     unawaited(_deps.foodCategories.load());
     unawaited(_deps.authCubit.restore());
     unawaited(_deps.connectivity.start());
+  }
+
+  Future<void> _syncDeviceSession(String token) async {
+    try {
+      final label = await currentDeviceLabel();
+      await _deps.accountSettings.touchCurrentDevice(
+        accessToken: token,
+        deviceLabel: label,
+      );
+    } catch (_) {
+      // Best-effort device registration on sign-in
+    }
   }
 
   String _lastPath = '';
@@ -459,6 +482,9 @@ class _DealGoAppState extends State<DealGoApp> with WidgetsBindingObserver {
   /// Android foreground push → in-app banner whose action routes like a
   /// notification tap (chat bursts collapse into the latest one).
   void _showForegroundPush(PushMessage message) {
+    if (_deps.authCubit.state is! AuthSignedIn) {
+      return;
+    }
     // Usually the socket already rang the call screen. But a foreground push
     // also arrives while the socket is reconnecting or just after sign-in, and
     // then nothing would ever ring: let the cubit open the call if it still

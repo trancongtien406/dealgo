@@ -1,22 +1,23 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-
-import '../../places/domain/place.dart';
-
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/design_system/components/dealgo_banner.dart';
+import '../../../core/design_system/components/dealgo_app_header.dart';
 import '../../../core/design_system/components/dealgo_card.dart';
 import '../../../core/design_system/components/dealgo_chip.dart';
-import '../../../core/design_system/components/dealgo_state_view.dart';
-import '../../../core/design_system/components/dealgo_skeleton.dart';
+import '../../../core/design_system/components/dealgo_nav_insets.dart';
 import '../../../core/design_system/components/dealgo_refresh.dart';
 import '../../../core/design_system/components/dealgo_segmented_control.dart';
+import '../../../core/design_system/components/dealgo_skeleton.dart';
+import '../../../core/design_system/components/dealgo_state_view.dart';
+import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
-import '../../../core/network/connectivity_service.dart';
-import '../../../core/network/request_failure.dart';
+import '../../../core/format/date_time_format.dart';
+import '../../../core/format/short_ref.dart';
+import '../../../core/realtime/realtime_refresh_watcher.dart';
+import '../../../core/realtime/snapshot_realtime.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../activity/domain/entities/history_models.dart';
 import '../../activity/domain/usecases/list_food_history.dart';
@@ -24,17 +25,11 @@ import '../../activity/domain/usecases/list_ride_history.dart';
 import '../../activity/presentation/cubit/activity_history_cubit.dart';
 import '../../identity/domain/entities/auth_state.dart';
 import '../../identity/presentation/cubit/auth_cubit.dart';
+import '../../places/domain/place.dart';
 import '../../ride/domain/entities/ride_money.dart';
 import 'account_widgets.dart';
-import '../../../core/design_system/icons/dealgo_icons.dart';
-import '../../../core/format/date_time_format.dart';
-import '../../../core/format/short_ref.dart';
-import '../../../core/design_system/components/dealgo_app_header.dart';
-import '../../../core/realtime/realtime_refresh_watcher.dart';
-import '../../../core/realtime/snapshot_realtime.dart';
-import '../../../core/design_system/components/dealgo_nav_insets.dart';
 
-enum _ActivityFilter { all, rides, food, shopping }
+enum _ActivityFilter { all, rides, food }
 
 class CustomerActivityPage extends StatelessWidget {
   const CustomerActivityPage({super.key});
@@ -126,157 +121,133 @@ class _CustomerActivityViewState extends State<_CustomerActivityView> {
     unawaited(watcher.start(accessToken: token, initialRefresh: false));
   }
 
+  Future<void> _reload(BuildContext context) {
+    final auth = context.read<AuthCubit>().state;
+    final token = auth is AuthSignedIn ? auth.tokens.accessToken : null;
+    return context.read<ActivityHistoryCubit>().load(accessToken: token);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context);
 
     return ColoredBox(
       color: DealGoColors.canvas,
       child: SafeArea(
         bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            DealGoAppHeader(
-              title: AppLocalizations.of(context).accountActivity,
-              showBack: false,
-              actions: BlocBuilder<ActivityHistoryCubit, ActivityHistoryState>(
-                builder: (context, state) => IconButton(
-                  key: const Key('activity-refresh'),
-                  tooltip: AppLocalizations.of(context).actionRefresh,
-                  onPressed: state.busy ? null : () => _reload(context),
-                  icon: Icon(DealGoIcons.refresh, color: DealGoColors.text),
+        child: BlocConsumer<ActivityHistoryCubit, ActivityHistoryState>(
+          listener: (context, state) {
+            if (state is ActivityHistoryFailure &&
+                (state.rides.isNotEmpty || state.food.isNotEmpty)) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(state.message.resolve(l10n))),
+              );
+            }
+          },
+          builder: (context, state) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                DealGoAppHeader(
+                  title: l10n.accountActivity,
+                  showBack: false,
+                  actions: IconButton(
+                    key: const Key('activity-refresh'),
+                    tooltip: l10n.actionRefresh,
+                    onPressed: state.busy ? null : () => _reload(context),
+                    icon: Icon(
+                      DealGoIcons.refresh,
+                      color: DealGoColors.text,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            StreamBuilder<bool>(
-              stream: context.read<ConnectivityService>().onStatusChanged,
-              initialData: context.read<ConnectivityService>().isOnline,
-              builder: (context, snapshot) {
-                if (snapshot.data ?? true) {
-                  return const SizedBox.shrink();
-                }
-                final l10n = AppLocalizations.of(context);
-                return Padding(
+                Padding(
                   padding: const EdgeInsets.fromLTRB(
                     DealGoDimensions.pageGutter,
-                    DealGoSpacing.s8,
+                    DealGoSpacing.s16,
                     DealGoDimensions.pageGutter,
                     0,
                   ),
-                  child: DealGoBanner(
-                    tone: DealGoBannerTone.offline,
-                    title: l10n.bannerOfflineTitle,
-                    message: l10n.activityOfflineBody,
+                  child: _FilterRow(
+                    selected: _filter,
+                    onSelected: (filter) => setState(() => _filter = filter),
                   ),
-                );
-              },
-            ),
-            Expanded(
-              child: BlocBuilder<ActivityHistoryCubit, ActivityHistoryState>(
-                builder: (context, state) {
-                  final l10n = AppLocalizations.of(context);
-                  final history = _visibleHistory(state);
-                  final initialLoad =
-                      state.busy && state.rides.isEmpty && state.food.isEmpty;
-                  return DealGoRefresh(
-                    onRefresh: () => _reload(context),
-                    child: ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: dealGoScrollPadding(
-                        context,
-                        const EdgeInsets.fromLTRB(
-                          DealGoDimensions.pageGutter,
-                          DealGoSpacing.s12,
-                          DealGoDimensions.pageGutter,
-                          DealGoSpacing.s16,
-                        ),
-                      ),
-                      children: [
-                        DealGoSegmentedControl(
-                          value: _filter.name,
-                          scrollable: false,
-                          onChanged: (id) => setState(
-                            () => _filter = _ActivityFilter.values.firstWhere(
-                              (e) => e.name == id,
-                            ),
-                          ),
-                          items: [
-                            DealGoSegmentItem(id: 'all', label: l10n.filterAll),
-                            DealGoSegmentItem(
-                              id: 'rides',
-                              label: l10n.filterRides,
-                            ),
-                            DealGoSegmentItem(
-                              id: 'food',
-                              label: l10n.filterFood,
-                            ),
-                            DealGoSegmentItem(
-                              id: 'shopping',
-                              label: l10n.filterShopping,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: DealGoSpacing.s16),
-                        if (initialLoad)
-                          const DealGoSkeletonList(
-                            itemCount: 4,
-                            padding: EdgeInsets.zero,
-                          )
-                        else if (state is ActivityHistoryFailure &&
-                            history.isEmpty)
-                          DealGoStateView.failure(
-                            context,
-                            onRetry: () => _reload(context),
-                            cause: state.message.error,
-                            message: state.message.resolve(l10n),
-                            compact: true,
-                          )
-                        else if (history.isEmpty)
-                          DealGoStateView(
-                            art: DealGoStateArt.noOrders,
-                            title: l10n.activityEmptyTitle,
-                            message: l10n.activityEmptyBody,
-                            compact: true,
-                          )
-                        else ...[
-                          if (state is ActivityHistoryFailure) ...[
-                            DealGoBanner(
-                              tone:
-                                  requestFailureKind(state.message.error) ==
-                                      RequestFailureKind.offline
-                                  ? DealGoBannerTone.offline
-                                  : DealGoBannerTone.warning,
-                              message: state.message.resolve(l10n),
-                            ),
-                            const SizedBox(height: DealGoSpacing.s12),
-                          ],
-                          Text(
-                            l10n.activityRecent,
-                            style: textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: DealGoSpacing.s12),
-                          for (final item in history) ...[
-                            _HistoryCard(item: item),
-                            const SizedBox(height: DealGoSpacing.s12),
-                          ],
-                        ],
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+                ),
+                Expanded(child: _body(context, state)),
+              ],
+            );
+          },
         ),
       ),
     );
   }
 
-  Future<void> _reload(BuildContext context) {
-    final auth = context.read<AuthCubit>().state;
-    final token = auth is AuthSignedIn ? auth.tokens.accessToken : null;
-    return context.read<ActivityHistoryCubit>().load(accessToken: token);
+  Widget _body(BuildContext context, ActivityHistoryState state) {
+    final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    final history = _visibleHistory(state);
+    final initialLoad =
+        state.busy && state.rides.isEmpty && state.food.isEmpty;
+    final padding = dealGoScrollPadding(
+      context,
+      const EdgeInsets.fromLTRB(
+        DealGoDimensions.pageGutter,
+        DealGoSpacing.s16,
+        DealGoDimensions.pageGutter,
+        DealGoSpacing.s24,
+      ),
+    );
+
+    if (initialLoad) {
+      return DealGoSkeletonList(
+        itemCount: 4,
+        padding: padding,
+        thumbSize: 44,
+        semanticLabel: l10n.inboxLoading,
+      );
+    }
+
+    if (state is ActivityHistoryFailure && history.isEmpty) {
+      return DealGoRefresh(
+        onRefresh: () => _reload(context),
+        child: DealGoStateView.failure(
+          context,
+          onRetry: () => _reload(context),
+          cause: state.message.error,
+          message: state.message.resolve(l10n),
+        ),
+      );
+    }
+
+    if (history.isEmpty) {
+      return DealGoRefresh(
+        onRefresh: () => _reload(context),
+        child: DealGoStateView(
+          art: DealGoStateArt.noOrders,
+          title: l10n.activityEmptyTitle,
+          message: l10n.activityEmptyBody,
+        ),
+      );
+    }
+
+    return DealGoRefresh(
+      onRefresh: () => _reload(context),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: padding,
+        children: [
+          Text(
+            l10n.activityRecent,
+            style: textTheme.titleMedium,
+          ),
+          const SizedBox(height: DealGoSpacing.s12),
+          for (final item in history) ...[
+            _HistoryCard(item: item),
+            const SizedBox(height: DealGoSpacing.s12),
+          ],
+        ],
+      ),
+    );
   }
 
   List<HistoryItem> _visibleHistory(ActivityHistoryState state) {
@@ -286,10 +257,45 @@ class _CustomerActivityViewState extends State<_CustomerActivityView> {
       if (_filter == _ActivityFilter.all || _filter == _ActivityFilter.food)
         ...state.food,
     ];
-    if (_filter == _ActivityFilter.shopping) {
-      return const [];
+    if (_filter == _ActivityFilter.all) {
+      combined.sort((a, b) => b.meta.compareTo(a.meta));
     }
     return combined;
+  }
+}
+
+class _FilterRow extends StatelessWidget {
+  const _FilterRow({required this.selected, required this.onSelected});
+
+  final _ActivityFilter selected;
+  final ValueChanged<_ActivityFilter> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return DealGoSegmentedControl(
+      value: selected.name,
+      scrollable: false,
+      onChanged: (id) =>
+          onSelected(_ActivityFilter.values.firstWhere((e) => e.name == id)),
+      items: [
+        DealGoSegmentItem(
+          id: 'all',
+          label: l10n.filterAll,
+          key: const Key('activity-filter-all'),
+        ),
+        DealGoSegmentItem(
+          id: 'rides',
+          label: l10n.filterRides,
+          key: const Key('activity-filter-rides'),
+        ),
+        DealGoSegmentItem(
+          id: 'food',
+          label: l10n.filterFood,
+          key: const Key('activity-filter-food'),
+        ),
+      ],
+    );
   }
 }
 

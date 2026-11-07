@@ -13,6 +13,7 @@ import '../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/network/request_failure.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/notifications/push_route_resolver.dart';
@@ -21,6 +22,8 @@ import '../../identity/presentation/cubit/auth_cubit.dart';
 import '../../inbox/domain/entities/inbox_notification.dart';
 import '../../inbox/domain/usecases/inbox_usecases.dart';
 import '../../inbox/presentation/inbox_unread.dart';
+import '../../food/domain/params/get_food_order_params.dart';
+import '../../food/domain/usecases/get_food_order.dart';
 import 'account_widgets.dart';
 import 'inbox_copy.dart';
 import 'shell_tab.dart';
@@ -221,6 +224,10 @@ class _NotificationsInboxPageState extends State<NotificationsInboxPage> {
       await _openDriverJob(item);
       return;
     }
+    if (_isCustomerFoodOrder(target) && item.aggregateId != null) {
+      await _openCustomerFoodOrder(item, target);
+      return;
+    }
     // A tab root (e.g. /driver/jobs, /customer) is another shell branch:
     // `push` stacks a second shell with no back button, so switch tabs.
     if (_isTabRoot(target)) {
@@ -228,6 +235,41 @@ class _NotificationsInboxPageState extends State<NotificationsInboxPage> {
       return;
     }
     await context.push(target);
+  }
+
+  static bool _isCustomerFoodOrder(String target) =>
+      RegExp(r'^/customer/food/orders/[^/?]+(?:\?.*)?$').hasMatch(target);
+
+  /// Verifies an inbox aggregate before opening its detail page. Inbox rows
+  /// outlive their order, and a reseed/retention cleanup can remove the
+  /// aggregate while leaving the historical notification intact.
+  Future<void> _openCustomerFoodOrder(
+    InboxNotification item,
+    String target,
+  ) async {
+    final token = _token;
+    final id = item.aggregateId;
+    if (token == null || id == null) return;
+    try {
+      await context.read<GetFoodOrder>()(
+        GetFoodOrderParams(accessToken: token, orderId: id),
+      );
+    } on ApiException catch (error) {
+      if (error.statusCode == 404 &&
+          error.errorCode == 'FOOD_ORDER_NOT_FOUND') {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            key: const Key('inbox-food-order-gone'),
+            content: Text(AppLocalizations.of(context).apiErrNotFound),
+          ),
+        );
+        return;
+      }
+      // For transient failures the tracking page can still render a stored
+      // offline snapshot and offer retry, so do not turn them into "missing".
+    }
+    if (mounted) await context.push(target);
   }
 
   static bool _isTabRoot(String target) => [
@@ -361,16 +403,10 @@ class _NotificationsInboxPageState extends State<NotificationsInboxPage> {
       case _Failed(:final cause):
         return DealGoRefresh(
           onRefresh: _load,
-          child: ListView(
-            padding: padding,
-            children: [
-              DealGoStateView.failure(
-                context,
-                onRetry: _retry,
-                cause: cause,
-                compact: true,
-              ),
-            ],
+          child: DealGoStateView.failure(
+            context,
+            onRetry: _retry,
+            cause: cause,
           ),
         );
       case _Loaded(:final items):
@@ -378,6 +414,16 @@ class _NotificationsInboxPageState extends State<NotificationsInboxPage> {
           for (final item in items)
             if (_matches(item)) item,
         ];
+        if (visible.isEmpty) {
+          return DealGoRefresh(
+            onRefresh: _load,
+            child: DealGoStateView(
+              art: DealGoStateArt.noNotifications,
+              title: l10n.notificationsEmptyTitle,
+              message: l10n.notificationsEmptyBody,
+            ),
+          );
+        }
         final now = DateTime.now();
         final groups = <_Section, List<InboxNotification>>{};
         for (final item in visible) {
@@ -392,27 +438,15 @@ class _NotificationsInboxPageState extends State<NotificationsInboxPage> {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: padding,
             children: [
-              if (visible.isEmpty)
-                DealGoStateView(
-                  art: DealGoStateArt.noNotifications,
-                  title: l10n.notificationsEmptyTitle,
-                  message: l10n.notificationsEmptyBody,
-                  compact: true,
-                )
-              else
-                for (final section in _Section.values)
-                  if (groups[section] case final entries?) ...[
-                    AccountSectionHeader(title: section.label(l10n)),
+              for (final section in _Section.values)
+                if (groups[section] case final entries?) ...[
+                  AccountSectionHeader(title: section.label(l10n)),
+                  const SizedBox(height: DealGoSpacing.s12),
+                  for (final item in entries) ...[
+                    _NoticeCard(item: item, now: now, onTap: () => _open(item)),
                     const SizedBox(height: DealGoSpacing.s12),
-                    for (final item in entries) ...[
-                      _NoticeCard(
-                        item: item,
-                        now: now,
-                        onTap: () => _open(item),
-                      ),
-                      const SizedBox(height: DealGoSpacing.s12),
-                    ],
                   ],
+                ],
               if (_loadingMore)
                 const Center(
                   child: Padding(

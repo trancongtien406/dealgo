@@ -89,120 +89,173 @@ class _PaymentHistoryViewState extends State<_PaymentHistoryView> {
             Expanded(
               child: DealGoRefresh(
                 onRefresh: () => _reload(context),
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(
-                    DealGoDimensions.pageGutter,
-                    DealGoSpacing.s8,
-                    DealGoDimensions.pageGutter,
-                    DealGoSpacing.s24,
-                  ),
-                  children: [
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: DealGoColors.primary,
-                        borderRadius: BorderRadius.circular(DealGoRadius.card),
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(
+                        DealGoDimensions.pageGutter,
+                        DealGoSpacing.s8,
+                        DealGoDimensions.pageGutter,
+                        0,
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(DealGoSpacing.s20),
+                      sliver: SliverToBoxAdapter(
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Text(
-                              l10n.paymentHistoryTotal,
-                              style: textTheme.bodySmall?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.9),
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: DealGoColors.primary,
+                                borderRadius: BorderRadius.circular(
+                                  DealGoRadius.card,
+                                ),
                               ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(DealGoSpacing.s20),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      l10n.paymentHistoryTotal,
+                                      style: textTheme.bodySmall?.copyWith(
+                                        color: Colors.white.withValues(alpha: 0.9),
+                                      ),
+                                    ),
+                                    const SizedBox(height: DealGoSpacing.s8),
+                                    Text(
+                                      formatRideVnd(total),
+                                      key: const Key('payment-history-total'),
+                                      style: textTheme.headlineMedium?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    const SizedBox(height: DealGoSpacing.s4),
+                                    Text(
+                                      l10n.paymentHistoryCount(paid.length),
+                                      style: textTheme.bodySmall?.copyWith(
+                                        color: Colors.white.withValues(alpha: 0.85),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: DealGoSpacing.s16),
+                            DealGoSegmentedControl(
+                              value: _filter.name,
+                              scrollable: false,
+                              onChanged: (id) => setState(
+                                () => _filter = _PaymentFilter.values.firstWhere(
+                                  (e) => e.name == id,
+                                ),
+                              ),
+                              items: [
+                                DealGoSegmentItem(
+                                  id: 'all',
+                                  label: l10n.paymentHistoryFilterAll,
+                                ),
+                                DealGoSegmentItem(
+                                  id: 'rides',
+                                  label: l10n.paymentHistoryFilterRides,
+                                ),
+                                DealGoSegmentItem(
+                                  id: 'food',
+                                  label: l10n.paymentHistoryFilterFood,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: DealGoSpacing.s20),
+                            Text(
+                              l10n.paymentHistoryRecent,
+                              style: textTheme.titleMedium,
                             ),
                             const SizedBox(height: DealGoSpacing.s8),
-                            Text(
-                              formatRideVnd(total),
-                              key: const Key('payment-history-total'),
-                              style: textTheme.headlineMedium?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: DealGoSpacing.s4),
-                            Text(
-                              l10n.paymentHistoryCount(paid.length),
-                              style: textTheme.bodySmall?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.85),
-                              ),
-                            ),
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: DealGoSpacing.s16),
-                    DealGoSegmentedControl(
-                      value: _filter.name,
-                      scrollable: false,
-                      onChanged: (id) => setState(
-                        () => _filter = _PaymentFilter.values.firstWhere(
-                          (e) => e.name == id,
-                        ),
-                      ),
-                      items: [
-                        DealGoSegmentItem(
-                          id: 'all',
-                          label: l10n.paymentHistoryFilterAll,
-                        ),
-                        DealGoSegmentItem(
-                          id: 'rides',
-                          label: l10n.paymentHistoryFilterRides,
-                        ),
-                        DealGoSegmentItem(
-                          id: 'food',
-                          label: l10n.paymentHistoryFilterFood,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: DealGoSpacing.s20),
-                    Text(
-                      l10n.paymentHistoryRecent,
-                      style: textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: DealGoSpacing.s8),
                     if (state is ActivityHistoryLoading && paid.isEmpty)
-                      const DealGoSkeletonList(itemCount: 3)
+                      const SliverPadding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: DealGoDimensions.pageGutter,
+                        ),
+                        sliver: SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: DealGoSkeletonList(itemCount: 3),
+                        ),
+                      )
                     else if (state is ActivityHistoryFailure && paid.isEmpty)
-                      DealGoStateView.failure(
-                        context,
-                        onRetry: () => _reload(context),
-                        cause: state.message.error,
-                        message: state.message.resolve(l10n),
-                        compact: true,
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: DealGoDimensions.pageGutter,
+                        ),
+                        sliver: SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Center(
+                            child: DealGoStateView.failure(
+                              context,
+                              onRetry: () => _reload(context),
+                              cause: state.message.error,
+                              message: state.message.resolve(l10n),
+                            ),
+                          ),
+                        ),
                       )
                     else if (visible.isEmpty)
-                      DealGoStateView(
-                        key: const Key('payment-history-empty'),
-                        art: DealGoStateArt.noOrders,
-                        title: l10n.paymentHistoryEmpty,
-                        compact: true,
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: DealGoDimensions.pageGutter,
+                        ),
+                        sliver: SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Center(
+                            child: DealGoStateView(
+                              key: const Key('payment-history-empty'),
+                              art: DealGoStateArt.noOrders,
+                              title: l10n.paymentHistoryEmpty,
+                            ),
+                          ),
+                        ),
                       )
                     else
-                      for (final item in visible)
-                        _TxRow(
-                          icon: item.kind == HistoryKind.ride
-                              ? DealGoIcons.car
-                              : DealGoIcons.food,
-                          color: item.kind == HistoryKind.ride
-                              ? const Color(0xFFFEF3C7)
-                              : const Color(0xFFFFEDD5),
-                          iconColor: item.kind == HistoryKind.ride
-                              ? const Color(0xFFD97706)
-                              : const Color(0xFFEA580C),
-                          title: historyTitle(
-                            AppLocalizations.of(context),
-                            item,
-                          ),
-                          subtitle: [
-                            formatLocalDateTime(item.meta),
-                            l10n.paymentHistoryCash,
-                          ].whereType<String>().join(' · '),
-                          amount: '-${formatRideVnd(item.amountVnd!)}',
-                          amountColor: DealGoColors.text,
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(
+                          DealGoDimensions.pageGutter,
+                          0,
+                          DealGoDimensions.pageGutter,
+                          DealGoSpacing.s24,
                         ),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final item = visible[index];
+                              return _TxRow(
+                                icon: item.kind == HistoryKind.ride
+                                    ? DealGoIcons.car
+                                    : DealGoIcons.food,
+                                color: item.kind == HistoryKind.ride
+                                    ? const Color(0xFFFEF3C7)
+                                    : const Color(0xFFFFEDD5),
+                                iconColor: item.kind == HistoryKind.ride
+                                    ? const Color(0xFFD97706)
+                                    : const Color(0xFFEA580C),
+                                title: historyTitle(
+                                  AppLocalizations.of(context),
+                                  item,
+                                ),
+                                subtitle: [
+                                  formatLocalDateTime(item.meta),
+                                  l10n.paymentHistoryCash,
+                                ].whereType<String>().join(' · '),
+                                amount: '-${formatRideVnd(item.amountVnd!)}',
+                                amountColor: DealGoColors.text,
+                              );
+                            },
+                            childCount: visible.length,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),

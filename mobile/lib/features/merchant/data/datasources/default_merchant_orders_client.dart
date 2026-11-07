@@ -151,6 +151,9 @@ class DefaultMerchantOrdersClient implements MerchantOrdersClient {
     String? description,
     int? prepMinutes,
     String? menuCategoryId,
+    int? originalPriceVnd,
+    List<MerchantItemImageUpload>? newImages,
+    List<FoodOptionGroup>? optionGroups,
   }) {
     return food.createMerchantItem(
       accessToken: accessToken,
@@ -160,6 +163,9 @@ class DefaultMerchantOrdersClient implements MerchantOrdersClient {
       description: description,
       prepMinutes: prepMinutes,
       menuCategoryId: menuCategoryId,
+      originalPriceVnd: originalPriceVnd,
+      newImages: newImages,
+      optionGroups: optionGroups,
     );
   }
 
@@ -171,11 +177,17 @@ class DefaultMerchantOrdersClient implements MerchantOrdersClient {
     int? priceVnd,
     bool? available,
     String? description,
+    bool clearDescription = false,
     int? prepMinutes,
+    bool clearPrepMinutes = false,
     String? imageUrl,
+    List<String>? imageUrls,
+    List<MerchantItemImageUpload>? newImages,
     String? menuCategoryId,
+    bool clearMenuCategoryId = false,
     int? originalPriceVnd,
     bool clearOriginalPrice = false,
+    List<FoodOptionGroup>? optionGroups,
   }) {
     return food.updateMerchantItem(
       accessToken: accessToken,
@@ -184,12 +196,26 @@ class DefaultMerchantOrdersClient implements MerchantOrdersClient {
       priceVnd: priceVnd,
       available: available,
       description: description,
+      clearDescription: clearDescription,
       prepMinutes: prepMinutes,
+      clearPrepMinutes: clearPrepMinutes,
       imageUrl: imageUrl,
+      imageUrls: imageUrls,
+      newImages: newImages,
       menuCategoryId: menuCategoryId,
+      clearMenuCategoryId: clearMenuCategoryId,
       originalPriceVnd: originalPriceVnd,
       clearOriginalPrice: clearOriginalPrice,
+      optionGroups: optionGroups,
     );
+  }
+
+  @override
+  Future<void> deleteCatalogItem({
+    required String accessToken,
+    required String itemId,
+  }) {
+    return food.deleteMerchantItem(accessToken: accessToken, itemId: itemId);
   }
 
   @override
@@ -262,12 +288,16 @@ class DefaultMerchantOrdersClient implements MerchantOrdersClient {
     int limit = 20,
     String? tab,
     String? q,
+    DateTime? from,
+    DateTime? to,
   }) => food.listMerchantOrderHistory(
     accessToken: accessToken,
     page: page,
     limit: limit,
     tab: tab,
     q: q,
+    from: from,
+    to: to,
   );
 
   @override

@@ -201,6 +201,7 @@ export class VoiceService implements OnModuleDestroy {
     }
     this.clearRingTimer(call.id);
     this.emit(declined);
+    await this.pushDismissAndroid(declined);
     return toView(declined);
   }
 
@@ -414,6 +415,7 @@ export class VoiceService implements OnModuleDestroy {
         );
       }
     }
+    await this.pushDismissAndroid(missed);
     await this.pushMissed(missed);
     return missed;
   }
@@ -519,6 +521,39 @@ export class VoiceService implements OnModuleDestroy {
           `incoming-call push failed for call ${shortOrderCode(call.id)}: ${String(error)}`,
         );
       }
+    }
+  }
+
+  /**
+   * Data-only Android push so `firebaseMessagingBackgroundHandler` runs even when the app
+   * is backgrounded or killed (an FCM push with a top-level `notification` block such as
+   * `Call.missed` is handled by the system tray and never wakes the background isolate).
+   */
+  private async pushDismissAndroid(call: VoiceCallRecord): Promise<void> {
+    if (!this.push) {
+      return;
+    }
+    try {
+      await this.push.send({
+        userId: call.calleeUserId,
+        title: '',
+        body: '',
+        data: {
+          aggregateType: call.aggregateType,
+          aggregateId: call.aggregateId,
+          eventType: 'Call.cancelled',
+          callId: call.id,
+        },
+        collapseKey: `call-dismiss-${call.id}`,
+        ttlSeconds: VOICE_CALL_RING_SECONDS,
+        urgent: true,
+        androidDataOnly: true,
+        skipPlatforms: ['ios', 'web'],
+      });
+    } catch (error) {
+      this.logger.warn(
+        `android call-dismiss push failed for call ${shortOrderCode(call.id)}: ${String(error)}`,
+      );
     }
   }
 

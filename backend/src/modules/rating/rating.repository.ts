@@ -60,12 +60,25 @@ export type ModeratedReviewRow = StoreReviewRow & {
   hiddenReason: string | null;
 };
 
+export type ModeratedReviewSort = 'NEWEST' | 'OLDEST' | 'LOWEST_STARS' | 'HIGHEST_STARS';
+
 export type OpsReviewFilter = {
   storeId?: string;
   hidden?: boolean;
+  /** Only reviews with this exact star count (1..5). */
+  stars?: number;
   /** Only reviews at or below this many stars (triage of complaints). */
   maxStars?: number;
+  /** True = answered by merchant, false = unanswered. */
+  replied?: boolean;
+  /** True = has non-empty customer text comment, false = no comment. */
+  hasComment?: boolean;
+  /** Only reviews containing this tag. */
+  tag?: RatingTag;
   q?: string;
+  from?: Date;
+  to?: Date;
+  sort?: ModeratedReviewSort;
 };
 
 export type ReviewHideAudit = { actorUserId: string; reason: string };
@@ -260,10 +273,34 @@ export class MemoryRatingRepository implements RatingRepository {
           row.storeStars !== null &&
           (!filter.storeId || row.storeId === filter.storeId) &&
           (filter.hidden === undefined || Boolean(row.hiddenAt) === filter.hidden) &&
+          (filter.stars === undefined || row.storeStars === filter.stars) &&
           (filter.maxStars === undefined || (row.storeStars as number) <= filter.maxStars) &&
-          (!needle || foldText(row.comment ?? '').includes(needle)),
+          (filter.replied === undefined || Boolean(row.merchantReply?.trim()) === filter.replied) &&
+          (filter.hasComment === undefined || Boolean(row.comment?.trim()) === filter.hasComment) &&
+          (!filter.tag || row.tags.includes(filter.tag)) &&
+          (!filter.from || row.createdAt.getTime() >= filter.from.getTime()) &&
+          (!filter.to || row.createdAt.getTime() <= filter.to.getTime()) &&
+          (!needle ||
+            foldText(row.comment ?? '').includes(needle) ||
+            foldText(row.merchantReply ?? '').includes(needle)),
       )
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      .sort((a, b) => {
+        switch (filter.sort) {
+          case 'OLDEST':
+            return a.createdAt.getTime() - b.createdAt.getTime();
+          case 'LOWEST_STARS': {
+            const diff = (a.storeStars as number) - (b.storeStars as number);
+            return diff !== 0 ? diff : b.createdAt.getTime() - a.createdAt.getTime();
+          }
+          case 'HIGHEST_STARS': {
+            const diff = (b.storeStars as number) - (a.storeStars as number);
+            return diff !== 0 ? diff : b.createdAt.getTime() - a.createdAt.getTime();
+          }
+          case 'NEWEST':
+          default:
+            return b.createdAt.getTime() - a.createdAt.getTime();
+        }
+      });
     const offset = (page - 1) * limit;
     return { items: rows.slice(offset, offset + limit).map(toModerated), total: rows.length };
   }

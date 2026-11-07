@@ -718,7 +718,9 @@ class MerchantQueueOrder {
     required this.lineCount,
     required this.createdAt,
     this.customerName,
+    this.customerAvatarUrl,
     this.driverName,
+    this.driverAvatarUrl,
   });
 
   final String id;
@@ -734,8 +736,14 @@ class MerchantQueueOrder {
   /// Masked by the server ("Tiến T."); never the full name or an id.
   final String? customerName;
 
+  /// Profile photo of the customer if present.
+  final String? customerAvatarUrl;
+
   /// Masked assigned driver name once a driver has claimed the delivery.
   final String? driverName;
+
+  /// Profile photo of the assigned driver if present.
+  final String? driverAvatarUrl;
 
   MerchantQueueOrder apply(MerchantOrderUpdate update) {
     return MerchantQueueOrder(
@@ -749,7 +757,9 @@ class MerchantQueueOrder {
       lineCount: update.lineCount ?? lineCount,
       createdAt: update.createdAt ?? createdAt,
       customerName: customerName,
+      customerAvatarUrl: customerAvatarUrl,
       driverName: driverName,
+      driverAvatarUrl: driverAvatarUrl,
     );
   }
 }
@@ -861,6 +871,10 @@ class FoodOrderDetail {
     this.pendingChange,
     this.note,
     this.utensils = true,
+    this.customerName,
+    this.customerAvatarUrl,
+    this.driverName,
+    this.driverAvatarUrl,
   });
 
   /// Store edit waiting for the customer's answer (customer/store only).
@@ -906,6 +920,18 @@ class FoodOrderDetail {
 
   /// Whether cutlery was requested; the server defaults to true.
   final bool utensils;
+
+  /// Masked customer name ("Tiến T.").
+  final String? customerName;
+
+  /// Customer profile avatar URL.
+  final String? customerAvatarUrl;
+
+  /// Masked assigned driver name.
+  final String? driverName;
+
+  /// Assigned driver avatar URL.
+  final String? driverAvatarUrl;
 
   FoodTrackingStage get stage => foodTrackingStage(status);
 }

@@ -12,6 +12,7 @@ import '../../../../l10n/app_localizations.dart';
 import '../../../food/data/datasources/food_remote_datasource.dart';
 import '../../../food/domain/entities/food_models.dart';
 import '../../../food/domain/entities/food_money.dart';
+import '../../../shell/presentation/account_widgets.dart';
 import '../utils/merchant_kitchen_lines.dart';
 import 'merchant_widgets.dart';
 
@@ -179,28 +180,30 @@ class _MerchantOrderChangeSheetState extends State<MerchantOrderChangeSheet> {
               spacing: DealGoSpacing.s8,
               children: [
                 for (final reason in FoodOrderChangeReason.values)
-                  ChoiceChip(
+                  AccountFilterChip(
                     key: Key('merchant-change-reason-${reason.wire}'),
                     selected: _reason == reason,
                     onSelected: _sending
-                        ? null
-                        : (_) => setState(() => _reason = reason),
-                    label: Text(switch (reason) {
+                        ? () {}
+                        : () => setState(() => _reason = reason),
+                    label: switch (reason) {
                       FoodOrderChangeReason.outOfStock =>
                         l10n.foodChangeReasonOutOfStock,
                       FoodOrderChangeReason.notEnoughPortions =>
                         l10n.foodChangeReasonNotEnough,
                       FoodOrderChangeReason.other => l10n.foodChangeReasonOther,
-                    }),
+                    },
                   ),
               ],
             ),
             const SizedBox(height: DealGoSpacing.s8),
             DealGoTextField(
-              key: const Key('merchant-change-note'),
+              fieldKey: const Key('merchant-change-note'),
               label: l10n.merchantEditOrderNote,
+              hint: 'VD: Đã hết phần cơm sườn, đổi sang món khác...',
               controller: _note,
               maxLength: 300,
+              textInputAction: TextInputAction.done,
               enabled: !_sending,
               onChanged: (_) => setState(() {}),
             ),

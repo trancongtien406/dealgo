@@ -4,7 +4,7 @@ import { PlatformSettingsService } from '../../platform/settings/platform-settin
 import { RideService } from '../ride/ride.service.js';
 import { RATING_REPOSITORY, type RatingSubjectType } from './rating.constants.js';
 import type { RequestActor } from '../identity/access-auth.guard.js';
-import type { OpsReviewsQueryDto, SubmitRatingDto } from './rating.dto.js';
+import type { MerchantReviewsQueryDto, OpsReviewsQueryDto, SubmitRatingDto } from './rating.dto.js';
 import {
   RatingAlreadySubmittedError,
   type ModeratedReviewRow,
@@ -129,12 +129,33 @@ export class RatingService {
   /** The merchant sees every review of its store, including hidden ones and below the min count. */
   async merchantReviews(
     actor: RequestActor,
-    page = 1,
+    queryOrPage: MerchantReviewsQueryDto | number = {},
   ): Promise<{ summary: StoreRatingSummary; items: ModeratedReview[]; total: number; page: number }> {
+    const query: MerchantReviewsQueryDto =
+      typeof queryOrPage === 'number' ? { page: queryOrPage } : queryOrPage;
+    const page = Math.max(1, query.page ?? 1);
+    const from =
+      query.from && !Number.isNaN(Date.parse(query.from)) ? new Date(query.from) : undefined;
+    const to = query.to && !Number.isNaN(Date.parse(query.to)) ? new Date(query.to) : undefined;
     const storeId = await this.food.merchantStoreId(actor);
     const [[summary], result] = await Promise.all([
       this.storeSummaries([storeId]),
-      this.ratings.listModerated({ storeId }, page, MERCHANT_REVIEW_LIMIT),
+      this.ratings.listModerated(
+        {
+          storeId,
+          stars: query.stars,
+          replied: query.replied === undefined ? undefined : query.replied === 'REPLIED',
+          hasComment: query.hasComment,
+          hidden: query.visibility === undefined ? undefined : query.visibility === 'HIDDEN',
+          tag: query.tag,
+          q: query.q,
+          from,
+          to,
+          sort: query.sort,
+        },
+        page,
+        MERCHANT_REVIEW_LIMIT,
+      ),
     ]);
     return {
       summary,

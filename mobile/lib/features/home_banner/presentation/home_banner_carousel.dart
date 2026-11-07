@@ -78,7 +78,10 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
     with
         WidgetsBindingObserver,
         AutomaticKeepAliveClientMixin<HomeBannerCarousel> {
-  final _page = PageController();
+  static const int _kLoopFactor = 1000;
+
+  PageController? _page;
+  int _lastInitialPage = 0;
   final _failedBannerIds = <String>{};
   List<HomeBanner>? _banners;
   HomeBannerTracker? _tracker;
@@ -89,6 +92,25 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
   var _foreground = true;
   ScrollPosition? _scroll;
   var _inViewport = true;
+
+  List<HomeBanner> get _activeBanners {
+    final all = _banners;
+    if (all == null || all.isEmpty) {
+      return const [];
+    }
+    return [
+      for (final banner in all)
+        if (!_failedBannerIds.contains(banner.id)) banner,
+    ];
+  }
+
+  static int _realIndex(int pageIndex, int count) {
+    if (count <= 0) {
+      return 0;
+    }
+    final remainder = pageIndex % count;
+    return remainder < 0 ? remainder + count : remainder;
+  }
 
   /// Feed headers sit in lazy slivers; rebuilding the carousel on every scroll
   /// back to the top repeated the public banners request and lost the page.
@@ -220,6 +242,20 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
     if (!mounted) {
       return;
     }
+    final activeCount =
+        banners.where((b) => !_failedBannerIds.contains(b.id)).length;
+    final initialPage = activeCount > 1 ? activeCount * _kLoopFactor : 0;
+    if (_page == null) {
+      _page = PageController(initialPage: initialPage);
+      _lastInitialPage = initialPage;
+    } else if (!_page!.hasClients) {
+      _page!.dispose();
+      _page = PageController(initialPage: initialPage);
+      _lastInitialPage = initialPage;
+    } else if (_lastInitialPage != initialPage) {
+      _page!.jumpToPage(initialPage);
+      _lastInitialPage = initialPage;
+    }
     setState(() {
       _banners = banners;
       _index = 0;
@@ -242,7 +278,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
   }
 
   bool get _canPlay {
-    final count = _banners?.length ?? 0;
+    final count = _activeBanners.length;
     return mounted &&
         count > 1 &&
         _visible &&
@@ -259,12 +295,14 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
       return;
     }
     _timer = Timer.periodic(widget.interval, (_) {
-      final count = _banners?.length ?? 0;
-      if (!_canPlay || !_page.hasClients || count < 2) {
+      final count = _activeBanners.length;
+      final controller = _page;
+      if (!_canPlay || controller == null || !controller.hasClients || count < 2) {
         return;
       }
-      _page.animateToPage(
-        (_index + 1) % count,
+      final currentPage = controller.page?.round() ?? controller.initialPage;
+      controller.animateToPage(
+        currentPage + 1,
         duration: const Duration(milliseconds: 420),
         curve: Curves.easeOutCubic,
       );
@@ -272,11 +310,10 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
   }
 
   void _markSeen() {
-    final banners = _banners;
+    final banners = _activeBanners;
     if (!mounted ||
         !_visible ||
         !_inViewport ||
-        banners == null ||
         banners.isEmpty) {
       return;
     }
@@ -285,11 +322,11 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
   }
 
   void _precache(int i) {
-    final banners = _banners;
-    if (!mounted || banners == null || banners.length < 2) {
+    final banners = _activeBanners;
+    if (!mounted || banners.length < 2) {
       return;
     }
-    final url = resolveMediaUrl(banners[i % banners.length].imageUrl);
+    final url = resolveMediaUrl(banners[_realIndex(i, banners.length)].imageUrl);
     if (url != null) {
       final media = MediaQuery.maybeOf(context);
       final width = media?.size.width ?? 400;
@@ -340,7 +377,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
     _scroll?.removeListener(_updateViewport);
     _timer?.cancel();
     unawaited(_tracker?.flush());
-    _page.dispose();
+    _page?.dispose();
     super.dispose();
   }
 
@@ -352,9 +389,18 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
     }
     if (_failedBannerIds.add(id)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          setState(() {});
+        if (!mounted) {
+          return;
         }
+        final count = _activeBanners.length;
+        final initialPage = count > 1 ? count * _kLoopFactor : 0;
+        if (_lastInitialPage != initialPage) {
+          _lastInitialPage = initialPage;
+          if (_page != null && _page!.hasClients) {
+            _page!.jumpToPage(initialPage);
+          }
+        }
+        setState(() {});
       });
     }
   }
@@ -362,17 +408,13 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final allBanners = _banners;
-    if (allBanners == null || allBanners.isEmpty) {
-      return widget.empty;
-    }
-    final banners = [
-      for (final banner in allBanners)
-        if (!_failedBannerIds.contains(banner.id)) banner,
-    ];
+    final banners = _activeBanners;
     if (banners.isEmpty) {
       return widget.empty;
     }
+    final isLooping = banners.length > 1;
+    final initialPage = isLooping ? banners.length * _kLoopFactor : 0;
+    final controller = _page ??= PageController(initialPage: initialPage);
     final l10n = AppLocalizations.of(context);
     return Padding(
       padding: EdgeInsets.only(bottom: widget.gapBelow),
@@ -391,25 +433,29 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel>
               fit: StackFit.expand,
               children: [
                 PageView.builder(
-                  controller: _page,
-                  itemCount: banners.length,
-                  onPageChanged: (index) {
+                  controller: controller,
+                  itemCount: isLooping ? null : 1,
+                  onPageChanged: (pageIndex) {
+                    final index = _realIndex(pageIndex, banners.length);
                     setState(() => _index = index);
                     _markSeen();
                     _precache(index + 1);
                     _arm();
                   },
-                  itemBuilder: (context, index) => _BannerPage(
-                    banner: banners[index],
-                    semanticsLabel: l10n.homeBannerSlideLabel(
-                      index + 1,
-                      banners.length,
-                    ),
-                    onTap: banners[index].cta == null
-                        ? null
-                        : () => _open(banners[index], index),
-                    onError: () => _onBannerFailed(banners[index].id),
-                  ),
+                  itemBuilder: (context, pageIndex) {
+                    final index = _realIndex(pageIndex, banners.length);
+                    return _BannerPage(
+                      banner: banners[index],
+                      semanticsLabel: l10n.homeBannerSlideLabel(
+                        index + 1,
+                        banners.length,
+                      ),
+                      onTap: banners[index].cta == null
+                          ? null
+                          : () => _open(banners[index], index),
+                      onError: () => _onBannerFailed(banners[index].id),
+                    );
+                  },
                 ),
                 if (banners.length > 1)
                   Positioned(

@@ -204,7 +204,11 @@ class DealGoBannerSkeleton extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              DealGoSkeletonBox(width: 76, height: 18, radius: DealGoRadius.pill),
+              DealGoSkeletonBox(
+                width: 76,
+                height: 18,
+                radius: DealGoRadius.pill,
+              ),
               Spacer(),
               FractionallySizedBox(
                 widthFactor: 0.65,

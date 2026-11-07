@@ -95,6 +95,7 @@ class _DriverJobCompletedPageState extends State<DriverJobCompletedPage> {
         child: DealGoPrimaryButton(
           key: const Key('driver-completed-back-jobs'),
           label: l10n.driverBackToJobs,
+          fullWidth: true,
           trailingIcon: DealGoIcons.arrowRight,
           onPressed: () => context.go('/driver/jobs'),
         ),

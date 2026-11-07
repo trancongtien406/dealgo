@@ -121,27 +121,6 @@ class FoodFareOfferPanel extends StatelessWidget {
               ],
             ),
           ),
-          if (offer != quote.suggestedVnd)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                key: const Key('food-fare-reset'),
-                onPressed: cubit.resetDeliveryOffer,
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(0, DealGoDimensions.minTapTarget),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: Text(l10n.foodFareReset),
-              ),
-            ),
-          const SizedBox(height: DealGoSpacing.s4),
-          Text(
-            l10n.foodFareNegotiationHint,
-            key: const Key('food-fare-negotiation-hint'),
-            style: DealGoType.meta(textTheme)
-                .copyWith(color: DealGoColors.textSecondary),
-          ),
         ],
       ),
     );

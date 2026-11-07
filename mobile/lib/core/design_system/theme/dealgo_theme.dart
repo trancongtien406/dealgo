@@ -196,12 +196,12 @@ abstract final class DealGoTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: colors.card,
-        isDense: false,
+        isDense: true,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: DealGoSpacing.s16,
-          vertical: DealGoSpacing.s16,
+          vertical: DealGoSpacing.s14,
         ),
-        hintStyle: textTheme.bodyMedium?.copyWith(color: colors.textTertiary),
+        hintStyle: textTheme.bodyLarge?.copyWith(color: colors.textTertiary),
         labelStyle: textTheme.bodyMedium?.copyWith(color: secondary),
         floatingLabelStyle: textTheme.labelMedium?.copyWith(
           color: DealGoColors.primary,
@@ -358,14 +358,19 @@ abstract final class DealGoTheme {
   }
 }
 
-ButtonStyle _ctaStyle(TextTheme textTheme) => const ButtonStyle(
-  minimumSize: WidgetStatePropertyAll(
+ButtonStyle _ctaStyle(TextTheme textTheme) => ButtonStyle(
+  minimumSize: const WidgetStatePropertyAll(
     Size(DealGoDimensions.minTapTarget, DealGoDimensions.minTapTarget),
   ),
-  padding: WidgetStatePropertyAll(
+  padding: const WidgetStatePropertyAll(
     EdgeInsets.symmetric(
       horizontal: DealGoSpacing.s16,
       vertical: DealGoSpacing.s12,
+    ),
+  ),
+  shape: WidgetStatePropertyAll(
+    RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(DealGoRadius.button),
     ),
   ),
 );

@@ -311,5 +311,51 @@ describe('RatingService', () => {
       expect(low.total).toBe(2);
       expect(low.items.every((item) => item.stars <= 2)).toBe(true);
     });
+
+    it('filters merchant reviews with comprehensive filters', async () => {
+      const { service, ratings } = setup();
+      const r1 = await ratings.create({
+        subjectType: 'FOOD_ORDER',
+        subjectId: '00000000-0000-4000-8000-000000000901',
+        raterId: 'c1',
+        driverId: null,
+        storeId: MERCHANT_STORE,
+        driverStars: null,
+        storeStars: 5,
+        tags: ['TASTY_FOOD'],
+        comment: 'Rất ngon và nóng hổi',
+      });
+      const r2 = await ratings.create({
+        subjectType: 'FOOD_ORDER',
+        subjectId: '00000000-0000-4000-8000-000000000902',
+        raterId: 'c2',
+        driverId: null,
+        storeId: MERCHANT_STORE,
+        driverStars: null,
+        storeStars: 2,
+        tags: ['COLD_FOOD'],
+        comment: 'Giao trễ, đồ ăn bị nguội',
+      });
+      await service.replyAsMerchant({ userId: 'merchant' } as never, r2.id, 'Quán xin lỗi bạn');
+
+      // Filter by stars
+      const star5 = await service.merchantReviews({ userId: 'merchant' } as never, { stars: 5 });
+      expect(star5.items.map((i) => i.id)).toEqual([r1.id]);
+
+      // Filter by replied
+      const replied = await service.merchantReviews({ userId: 'merchant' } as never, { replied: 'REPLIED' });
+      expect(replied.items.map((i) => i.id)).toEqual([r2.id]);
+
+      const unreplied = await service.merchantReviews({ userId: 'merchant' } as never, { replied: 'UNREPLIED' });
+      expect(unreplied.items.map((i) => i.id)).toEqual([r1.id]);
+
+      // Filter by search query
+      const searchRes = await service.merchantReviews({ userId: 'merchant' } as never, { q: 'nong hoi' });
+      expect(searchRes.items.map((i) => i.id)).toEqual([r1.id]);
+
+      // Filter by tag
+      const tagRes = await service.merchantReviews({ userId: 'merchant' } as never, { tag: 'COLD_FOOD' });
+      expect(tagRes.items.map((i) => i.id)).toEqual([r2.id]);
+    });
   });
 });

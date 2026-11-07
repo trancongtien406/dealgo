@@ -936,6 +936,14 @@ export class PrismaIdentityRepository implements IdentityRepository {
         });
       }
     }
+    if (role === 'OPS') {
+      and.push({
+        OR: [
+          { opsCredential: null },
+          { opsCredential: { superAdmin: false } },
+        ],
+      });
+    }
     if (role === 'OPS' && filter?.staffRole && filter.staffRole !== 'ALL') {
       const staffRole = filter.staffRole.toUpperCase();
       if (staffRole === 'ADMIN') {
@@ -1231,6 +1239,11 @@ export class PrismaIdentityRepository implements IdentityRepository {
     return passkeys.map(mapPasskey);
   }
 
+  async deletePasskey(userId: string, id: string): Promise<boolean> {
+    const res = await this.db.passkey.deleteMany({ where: { id, userId } });
+    return res.count > 0;
+  }
+
   async findPasskeyByCredentialId(
     credentialId: string,
   ): Promise<PasskeyRecord | null> {
@@ -1458,6 +1471,7 @@ function mapPasskey(passkey: {
   transports: string[];
   deviceType: string | null;
   backedUp: boolean;
+  createdAt: Date;
 }): PasskeyRecord {
   return {
     id: passkey.id,
@@ -1468,6 +1482,7 @@ function mapPasskey(passkey: {
     transports: passkey.transports,
     deviceType: passkey.deviceType,
     backedUp: passkey.backedUp,
+    createdAt: passkey.createdAt,
   };
 }
 

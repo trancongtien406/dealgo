@@ -79,9 +79,19 @@ class _VouchersPageState extends State<VouchersPage> {
       cart = null;
     }
     cart?.applyVoucher(code: voucher.code);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(l10n.vouchersUseDone(voucher.code))));
+    final rawShort = cart == null
+        ? 0
+        : voucher.minOrderVnd - cart.state.subtotalVnd;
+    final short = rawShort > 0 ? rawShort : 0;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          short > 0
+              ? '${l10n.vouchersUseDone(voucher.code)} · ${l10n.voucherNeedMore(formatVnd(short))}'
+              : l10n.vouchersUseDone(voucher.code),
+        ),
+      ),
+    );
     context.go('/customer/shop');
   }
 
@@ -140,9 +150,9 @@ class _VouchersPageState extends State<VouchersPage> {
                                   index == items.length
                                   ? Text(
                                       l10n.vouchersFootnote,
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall,
                                     )
                                   : _VoucherCard(
                                       voucher: items[index],

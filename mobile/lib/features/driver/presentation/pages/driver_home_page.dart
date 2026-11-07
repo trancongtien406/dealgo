@@ -171,7 +171,10 @@ class DriverIneligibleView extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(l10n.driverRightsByService, style: textTheme.titleMedium),
+                  Text(
+                    l10n.driverRightsByService,
+                    style: textTheme.titleMedium,
+                  ),
                   const SizedBox(height: DealGoSpacing.s12),
                   _RightRow(
                     label: l10n.driverServicePassenger,
@@ -329,169 +332,172 @@ class _DriverOnlineViewState extends State<DriverOnlineView> {
             ),
           ),
           children: [
-          DriverPanel(
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 22,
-                  backgroundColor: DealGoColors.subtlePurple,
-                  child: Text(
-                    headline.characters.first.toUpperCase(),
-                    style: const TextStyle(
-                      color: DealGoColors.primary,
-                      fontWeight: FontWeight.w800,
+            DriverPanel(
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: DealGoColors.subtlePurple,
+                    child: Text(
+                      headline.characters.first.toUpperCase(),
+                      style: const TextStyle(
+                        color: DealGoColors.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
+                  ),
+                  const SizedBox(width: DealGoSpacing.s12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(headline, style: textTheme.titleMedium),
+                        if (name.isNotEmpty && phone.isNotEmpty)
+                          Text(phone, style: textTheme.bodySmall),
+                      ],
+                    ),
+                  ),
+                  _OnlineBadge(
+                    onPressed: () =>
+                        context.read<DriverDutyCubit>().disconnect(),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: DealGoSpacing.s12),
+            DriverDutyMap(
+              online: context.watch<DriverDutyCubit>().state,
+              vehicleClassCode: vehicleClass,
+              demand: feedDemandPoints(context.watch<DriverFeedCubit>().state),
+            ),
+            const SizedBox(height: DealGoSpacing.s12),
+            Row(
+              children: [
+                Expanded(
+                  child: _StatTile(
+                    key: const Key('driver-stat-today-jobs'),
+                    label: l10n.driverStatTodayJobs,
+                    value: summary == null
+                        ? '—'
+                        : '${summary.today.completedJobs}',
                   ),
                 ),
                 const SizedBox(width: DealGoSpacing.s12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: _StatTile(
+                    key: const Key('driver-stat-today-earnings'),
+                    label: l10n.driverStatTodayEarnings,
+                    value: summary == null
+                        ? '—'
+                        : formatRideVnd(summary.today.earningsVnd),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: DealGoSpacing.s12),
+            Row(
+              children: [
+                Expanded(
+                  child: _StatTile(
+                    key: const Key('driver-stat-rating'),
+                    label: l10n.driverStatRating,
+                    value: rating == null || summary!.ratingCount == 0
+                        ? '—'
+                        : formatRatingAverage(context, rating),
+                  ),
+                ),
+                const SizedBox(width: DealGoSpacing.s12),
+                Expanded(
+                  child: _StatTile(
+                    key: const Key('driver-stat-week-jobs'),
+                    label: l10n.driverStatWeekJobs,
+                    value: summary == null
+                        ? '—'
+                        : '${summary.weekCompletedJobs}',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: DealGoSpacing.s12),
+            DriverPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Text(headline, style: textTheme.titleMedium),
-                      if (name.isNotEmpty && phone.isNotEmpty)
-                        Text(phone, style: textTheme.bodySmall),
+                      Expanded(
+                        child: Text(
+                          l10n.driverAllowedServices,
+                          style: textTheme.titleMedium,
+                        ),
+                      ),
+                      IconButton(
+                        key: const Key('driver-open-services'),
+                        tooltip: l10n.driverServiceSettings,
+                        onPressed: () => context.push(DriverRoutes.services),
+                        icon: const Icon(DealGoIcons.tune, size: 20),
+                      ),
                     ],
                   ),
-                ),
-                _OnlineBadge(
-                  onPressed: () => context.read<DriverDutyCubit>().disconnect(),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-          DriverDutyMap(
-            online: context.watch<DriverDutyCubit>().state,
-            vehicleClassCode: vehicleClass,
-            demand: feedDemandPoints(context.watch<DriverFeedCubit>().state),
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-          Row(
-            children: [
-              Expanded(
-                child: _StatTile(
-                  key: const Key('driver-stat-today-jobs'),
-                  label: l10n.driverStatTodayJobs,
-                  value: summary == null
-                      ? '—'
-                      : '${summary.today.completedJobs}',
-                ),
-              ),
-              const SizedBox(width: DealGoSpacing.s12),
-              Expanded(
-                child: _StatTile(
-                  key: const Key('driver-stat-today-earnings'),
-                  label: l10n.driverStatTodayEarnings,
-                  value: summary == null
-                      ? '—'
-                      : formatRideVnd(summary.today.earningsVnd),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-          Row(
-            children: [
-              Expanded(
-                child: _StatTile(
-                  key: const Key('driver-stat-rating'),
-                  label: l10n.driverStatRating,
-                  value: rating == null || summary!.ratingCount == 0
-                      ? '—'
-                      : formatRatingAverage(context, rating),
-                ),
-              ),
-              const SizedBox(width: DealGoSpacing.s12),
-              Expanded(
-                child: _StatTile(
-                  key: const Key('driver-stat-week-jobs'),
-                  label: l10n.driverStatWeekJobs,
-                  value: summary == null ? '—' : '${summary.weekCompletedJobs}',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-          DriverPanel(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        l10n.driverAllowedServices,
-                        style: textTheme.titleMedium,
-                      ),
-                    ),
-                    IconButton(
-                      key: const Key('driver-open-services'),
-                      tooltip: l10n.driverServiceSettings,
-                      onPressed: () => context.push(DriverRoutes.services),
-                      icon: const Icon(DealGoIcons.tune, size: 20),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: DealGoSpacing.s8),
-                _ServiceSwitch(
-                  key: const Key('driver-home-ride-switch'),
-                  leading: DriverVehicleVisual(
-                    vehicleClassCode: vehicleClass,
-                    size: 28,
-                  ),
-                  title: l10n.driverServicePassenger,
-                  subtitle: rideVehicleClassName(context, vehicleClass),
-                  value: services.prefs.rideEnabled,
-                  onChanged: services.busy
-                      ? null
-                      : (value) => _toggle(ride: value),
-                ),
-                if (driverFoodServiceVisible(vehicleClass)) ...[
-                  const Divider(height: 1),
+                  const SizedBox(height: DealGoSpacing.s8),
                   _ServiceSwitch(
-                    key: const Key('driver-home-food-switch'),
-                    leading: const Icon(
-                      DriverServiceIcons.food,
-                      color: DealGoColors.primary,
+                    key: const Key('driver-home-ride-switch'),
+                    leading: DriverVehicleVisual(
+                      vehicleClassCode: vehicleClass,
+                      size: 28,
                     ),
-                    title: l10n.driverServicesFoodTitle,
-                    value: services.prefs.foodEnabled,
+                    title: l10n.driverServicePassenger,
+                    subtitle: rideVehicleClassName(context, vehicleClass),
+                    value: services.prefs.rideEnabled,
                     onChanged: services.busy
                         ? null
-                        : (value) => _toggle(food: value),
+                        : (value) => _toggle(ride: value),
                   ),
-                ] else ...[
+                  if (driverFoodServiceVisible(vehicleClass)) ...[
+                    const Divider(height: 1),
+                    _ServiceSwitch(
+                      key: const Key('driver-home-food-switch'),
+                      leading: const Icon(
+                        DriverServiceIcons.food,
+                        color: DealGoColors.primary,
+                      ),
+                      title: l10n.driverServicesFoodTitle,
+                      value: services.prefs.foodEnabled,
+                      onChanged: services.busy
+                          ? null
+                          : (value) => _toggle(food: value),
+                    ),
+                  ] else ...[
+                    const Divider(height: 1),
+                    Padding(
+                      key: const Key('driver-home-food-motorbike-only'),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: DealGoSpacing.s8,
+                      ),
+                      child: Text(
+                        l10n.driverServicesFoodMotorbikeOnly,
+                        style: textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
                   const Divider(height: 1),
-                  Padding(
-                    key: const Key('driver-home-food-motorbike-only'),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: DealGoSpacing.s8,
+                  _ServiceSwitch(
+                    key: const Key('driver-home-parcel-switch'),
+                    leading: const Icon(
+                      DriverServiceIcons.parcel,
+                      color: DealGoColors.primary,
                     ),
-                    child: Text(
-                      l10n.driverServicesFoodMotorbikeOnly,
-                      style: textTheme.bodySmall,
-                    ),
+                    title: l10n.driverServiceParcel,
+                    subtitle: l10n.driverServiceParcelHint,
+                    value: services.prefs.parcelEnabled,
+                    onChanged: services.busy
+                        ? null
+                        : (value) => _toggle(parcel: value),
                   ),
                 ],
-                const Divider(height: 1),
-                _ServiceSwitch(
-                  key: const Key('driver-home-parcel-switch'),
-                  leading: const Icon(
-                    DriverServiceIcons.parcel,
-                    color: DealGoColors.primary,
-                  ),
-                  title: l10n.driverServiceParcel,
-                  subtitle: l10n.driverServiceParcelHint,
-                  value: services.prefs.parcelEnabled,
-                  onChanged: services.busy
-                      ? null
-                      : (value) => _toggle(parcel: value),
-                ),
-              ],
+              ),
             ),
-          ),
-        ],
+          ],
         ),
       ),
     );

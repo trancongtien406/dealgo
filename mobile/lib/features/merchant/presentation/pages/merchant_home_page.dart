@@ -69,11 +69,7 @@ class _MerchantHomePageState extends State<MerchantHomePage> {
     });
     final token = merchantAccessToken(context);
     final queueFuture = silentQueue ? queue.refresh() : queue.load(token);
-    final statsFuture = _stats.load(
-      token,
-      days: 1,
-      includeStatement: false,
-    );
+    final statsFuture = _stats.load(token, days: 1, includeStatement: false);
     // DEC-PROD-043: subscribe store: even when the queue is empty.
     unawaited(_bindStoreRoom(token, afterStats: statsFuture));
     await Future.wait([queueFuture, statsFuture]);

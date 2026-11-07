@@ -628,6 +628,7 @@ export type CreateCatalogItemInput = {
   description?: string | null;
   prepMinutes?: number | null;
   imageUrl?: string | null;
+  imageUrls?: string[];
   menuCategoryId?: string | null;
 };
 
@@ -664,6 +665,7 @@ export type MerchantHistoryRow = {
   createdAt: Date;
   finishedAt: Date;
   customerName: string | null;
+  customerAvatarUrl?: string | null;
   lineSummary: string;
 };
 
@@ -889,6 +891,10 @@ export interface FoodRepository {
   }>;
   createItem(input: CreateCatalogItemInput): Promise<StoreItemView>;
   updateItem(input: UpdateCatalogItemInput): Promise<StoreItemView>;
+  deleteItem(
+    ownerId: string,
+    itemId: string,
+  ): Promise<{ deleted: true; id: string; imageUrls: string[] }>;
   /** Public image serve: current imageUrl for an item id, or null. */
   findItemImageUrl(itemId: string): Promise<string | null>;
   findItemImageUrls(itemId: string): Promise<string[]>;
@@ -1171,7 +1177,7 @@ export class MemoryFoodRepository implements FoodRepository {
   constructor(private readonly vouchers?: VoucherRedeemer) {}
 
   private readonly stores: StoredStore[] = [];
-  private readonly items: StoredItem[] = [];
+  private items: StoredItem[] = [];
   private readonly deliveryOffers: FoodDeliveryOfferView[] = [];
   private readonly seededAt = new Date();
   private lastItemCreatedAt = this.seededAt.getTime();
@@ -2023,6 +2029,12 @@ export class MemoryFoodRepository implements FoodRepository {
       throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
     }
     const available = input.available ?? true;
+    const urls =
+      input.imageUrls !== undefined
+        ? input.imageUrls
+        : input.imageUrl
+          ? [input.imageUrl]
+          : [];
     const stored: StoredItem = {
       id: randomUUID(),
       storeId: store.id,
@@ -2034,14 +2046,31 @@ export class MemoryFoodRepository implements FoodRepository {
       createdAt: this.nextItemCreatedAt(),
       description: input.description ?? null,
       prepMinutes: input.prepMinutes ?? null,
-      imageUrl: input.imageUrl ?? null,
-      imageUrls: input.imageUrl ? [input.imageUrl] : [],
+      imageUrl: urls[0] ?? input.imageUrl ?? null,
+      imageUrls: urls,
       soldCount: 0,
       menuCategoryId: input.menuCategoryId ?? null,
       optionGroups: [],
     };
     this.items.push(stored);
     return memoryItemView(stored);
+  }
+
+  async deleteItem(
+    ownerId: string,
+    itemId: string,
+  ): Promise<{ deleted: true; id: string; imageUrls: string[] }> {
+    const item = this.requireOwnedItem(ownerId, itemId);
+    const imageUrls = [
+      ...(item.imageUrls ?? []),
+      ...(item.imageUrl ? [item.imageUrl] : []),
+    ];
+    this.items = this.items.filter((entry) => entry.id !== item.id);
+    return {
+      deleted: true,
+      id: item.id,
+      imageUrls: [...new Set(imageUrls)],
+    };
   }
 
   async updateItem(input: UpdateCatalogItemInput): Promise<StoreItemView> {

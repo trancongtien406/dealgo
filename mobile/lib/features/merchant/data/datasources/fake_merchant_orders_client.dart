@@ -23,6 +23,8 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
     this.onSetAvailability,
     this.onReplaceOptions,
     this.optionsError,
+    this.onDeleteItem,
+    this.deleteError,
   });
 
   List<MerchantQueueOrder> queueOrders;
@@ -355,6 +357,10 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
     return updated;
   }
 
+  final deleteCalls = <String>[];
+  Object? deleteError;
+  void Function(String itemId)? onDeleteItem;
+
   @override
   Future<FoodMenuItem> createCatalogItem({
     required String accessToken,
@@ -364,6 +370,9 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
     String? description,
     int? prepMinutes,
     String? menuCategoryId,
+    int? originalPriceVnd,
+    List<MerchantItemImageUpload>? newImages,
+    List<FoodOptionGroup>? optionGroups,
   }) async {
     createCalls.add((
       name: name,
@@ -378,6 +387,14 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
       throw error;
     }
     final handler = onCreateItem;
+    final uploadedUrls = [
+      if (newImages != null)
+        for (var i = 0; i < newImages.length; i++)
+          '/v1/public/menu-items/new/fake-$i.jpg',
+    ];
+    if (newImages != null && newImages.isNotEmpty) {
+      uploadImageCalls.add('new');
+    }
     if (handler == null) {
       throw const ApiException(
         statusCode: 500,
@@ -385,7 +402,16 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
         errorCode: 'FAKE_MISSING_HANDLER',
       );
     }
-    return handler(name, priceVnd, available);
+    final base = handler(name, priceVnd, available);
+    return base.copyWith(
+      description: description,
+      prepMinutes: prepMinutes,
+      menuCategoryId: menuCategoryId,
+      originalPriceVnd: originalPriceVnd,
+      imageUrl: uploadedUrls.isNotEmpty ? uploadedUrls.first : base.imageUrl,
+      imageUrls: uploadedUrls.isNotEmpty ? uploadedUrls : base.imageUrls,
+      optionGroups: optionGroups ?? base.optionGroups,
+    );
   }
 
   @override
@@ -396,13 +422,22 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
     int? priceVnd,
     bool? available,
     String? description,
+    bool clearDescription = false,
     int? prepMinutes,
+    bool clearPrepMinutes = false,
     String? imageUrl,
+    List<String>? imageUrls,
+    List<MerchantItemImageUpload>? newImages,
     String? menuCategoryId,
+    bool clearMenuCategoryId = false,
     int? originalPriceVnd,
     bool clearOriginalPrice = false,
+    List<FoodOptionGroup>? optionGroups,
   }) async {
     updateCalls.add((itemId: itemId, name: name, priceVnd: priceVnd));
+    if (newImages != null && newImages.isNotEmpty) {
+      uploadImageCalls.add(itemId);
+    }
     final error = updateError;
     if (error != null) {
       throw error;
@@ -416,15 +451,46 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
       );
     }
     final item = handler(itemId, name, priceVnd);
+    final baseUrls = imageUrls ?? item.imageUrls;
+    final addedUrls = [
+      if (newImages != null)
+        for (var i = 0; i < newImages.length; i++)
+          '/v1/public/menu-items/$itemId/fake-${baseUrls.length + i}.jpg',
+    ];
+    final nextUrls = (imageUrls != null || addedUrls.isNotEmpty)
+        ? [...baseUrls, ...addedUrls]
+        : null;
+    final nextImageUrl = nextUrls != null
+        ? (nextUrls.isNotEmpty ? nextUrls.first : null)
+        : imageUrl;
     return item.copyWith(
       available: available,
       description: description,
+      clearDescription: clearDescription,
       prepMinutes: prepMinutes,
-      imageUrl: imageUrl,
+      clearPrepMinutes: clearPrepMinutes,
+      imageUrl: nextImageUrl,
+      clearImageUrl: nextUrls != null && nextUrls.isEmpty,
+      imageUrls: nextUrls,
       menuCategoryId: menuCategoryId,
+      clearMenuCategoryId: clearMenuCategoryId,
       originalPriceVnd: originalPriceVnd,
       clearOriginalPrice: clearOriginalPrice,
+      optionGroups: optionGroups,
     );
+  }
+
+  @override
+  Future<void> deleteCatalogItem({
+    required String accessToken,
+    required String itemId,
+  }) async {
+    deleteCalls.add(itemId);
+    final error = deleteError;
+    if (error != null) {
+      throw error;
+    }
+    onDeleteItem?.call(itemId);
   }
 
   @override
@@ -540,6 +606,8 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
     int limit = 20,
     String? tab,
     String? q,
+    DateTime? from,
+    DateTime? to,
   }) async {
     var items = List.of(historyOrders);
     if (tab == 'DELIVERED') {
@@ -547,6 +615,24 @@ class FakeMerchantOrdersClient implements MerchantOrdersClient {
     } else if (tab == 'CANCELLED') {
       items = items
           .where((o) => o.status == 'CANCELLED' || o.status == 'FAILED')
+          .toList();
+    }
+    if (from != null) {
+      items = items
+          .where(
+            (o) =>
+                o.finishedAt.isAfter(from) ||
+                o.finishedAt.isAtSameMomentAs(from),
+          )
+          .toList();
+    }
+    if (to != null) {
+      items = items
+          .where(
+            (o) =>
+                o.finishedAt.isBefore(to) ||
+                o.finishedAt.isAtSameMomentAs(to),
+          )
           .toList();
     }
     if (q != null && q.trim().isNotEmpty) {

@@ -22,6 +22,7 @@ class VoucherField extends StatefulWidget {
     this.deliveryFeeVnd,
     this.storeId,
     this.onQuote,
+    this.onRejected,
     this.initialCode,
     this.seededCode,
     this.seededCodeVersion = 0,
@@ -35,6 +36,7 @@ class VoucherField extends StatefulWidget {
   final String? Function() accessToken;
   final String Function(int amountVnd) formatAmount;
   final ValueChanged<VoucherQuote?>? onQuote;
+  final void Function(String code, String? rejectCode)? onRejected;
 
   /// Code already held by the caller (e.g. the cart); re-quoted on mount.
   final String? initialCode;
@@ -121,6 +123,7 @@ class _VoucherFieldState extends State<VoucherField> {
     });
     VoucherQuote? quote;
     String? failure;
+    String? rejectCode;
     try {
       quote = await context.read<ValidateVoucher>()(
         accessToken: token,
@@ -132,12 +135,16 @@ class _VoucherFieldState extends State<VoucherField> {
       );
       if (!quote.valid) {
         // Server reasons are developer copy; the rejection code is localized.
-        final code = quote.rejectCode;
-        failure = code == null
+        rejectCode = quote.rejectCode;
+        failure = rejectCode == null
             ? l10n.voucherErrInvalid
             : apiErrorText(
                 l10n,
-                ApiException(statusCode: 422, message: '', errorCode: code),
+                ApiException(
+                  statusCode: 422,
+                  message: '',
+                  errorCode: rejectCode,
+                ),
                 fallback: l10n.voucherErrInvalid,
               );
         quote = null;
@@ -157,7 +164,18 @@ class _VoucherFieldState extends State<VoucherField> {
       _error = failure;
       _quote = quote;
     });
-    widget.onQuote?.call(quote);
+    if (quote != null) {
+      widget.onQuote?.call(quote);
+    } else {
+      final onRejected = widget.onRejected;
+      if (onRejected != null) {
+        onRejected(code, rejectCode);
+      } else {
+        // Preserve the generic field contract for Ride and older callers:
+        // a rejected quote clears their currently applied voucher.
+        widget.onQuote?.call(null);
+      }
+    }
     if (silent) {
       return;
     }
@@ -221,49 +239,63 @@ class _VoucherFieldState extends State<VoucherField> {
         ),
       );
     }
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: DealGoTextField(
-            fieldKey: const Key('voucher-field'),
-            label: l10n.voucherLabel,
-            hint: l10n.voucherHint,
-            showLabel: false,
-            controller: _controller,
-            enabled: !_busy,
-            errorText: _error,
-            textCapitalization: TextCapitalization.characters,
-            textInputAction: TextInputAction.done,
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp('[A-Za-z0-9_-]')),
-              LengthLimitingTextInputFormatter(32),
-            ],
-            onChanged: (_) {
-              if (_error != null) {
-                setState(() => _error = null);
-              }
-            },
-            onSubmitted: (_) => _apply(),
-          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: DealGoTextField(
+                fieldKey: const Key('voucher-field'),
+                label: l10n.voucherLabel,
+                hint: l10n.voucherHint,
+                showLabel: false,
+                controller: _controller,
+                enabled: !_busy,
+                errorText: _error,
+                textCapitalization: TextCapitalization.characters,
+                textInputAction: TextInputAction.done,
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp('[A-Za-z0-9_-]')),
+                  LengthLimitingTextInputFormatter(32),
+                ],
+                onChanged: (_) {
+                  if (_error != null) {
+                    setState(() => _error = null);
+                  }
+                },
+                onSubmitted: (_) => _apply(),
+              ),
+            ),
+            const SizedBox(width: DealGoSpacing.s8),
+            ConstrainedBox(
+              constraints: const BoxConstraints(
+                minHeight: DealGoDimensions.inputHeight,
+              ),
+              child: FilledButton.tonal(
+                key: const Key('voucher-apply'),
+                onPressed: _busy ? null : _apply,
+                child: _busy
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(l10n.voucherApply),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: DealGoSpacing.s8),
-        // Matches the field's height without pinning it (large text grows).
-        ConstrainedBox(
-          constraints: const BoxConstraints(
-            minHeight: DealGoDimensions.inputHeight,
+        if (_error != null && _controller.text.isNotEmpty)
+          Align(
+            alignment: AlignmentDirectional.centerEnd,
+            child: TextButton.icon(
+              key: const Key('voucher-rejected-remove'),
+              onPressed: _clear,
+              icon: const Icon(DealGoIcons.close, size: 16),
+              label: Text(l10n.voucherRemove),
+            ),
           ),
-          child: FilledButton.tonal(
-            key: const Key('voucher-apply'),
-            onPressed: _busy ? null : _apply,
-            child: _busy
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(l10n.voucherApply),
-          ),
-        ),
       ],
     );
   }

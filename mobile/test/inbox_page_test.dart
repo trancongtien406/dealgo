@@ -1,3 +1,4 @@
+import 'package:dealgo/core/mock/fake_food_client.dart';
 import 'package:dealgo/core/realtime/fake_snapshot_realtime.dart';
 import 'package:dealgo/features/inbox/data/datasources/inbox_remote_datasource.dart';
 import 'package:dealgo/features/inbox/domain/entities/inbox_notification.dart';
@@ -53,6 +54,47 @@ void main() {
 
     expect(find.text('Giảm 20.000đ cho đơn đồ ăn'), findsOneWidget);
     expect(find.text('Tài xế đã đến điểm đón'), findsNothing);
+  });
+
+  testWidgets('missing food order stays in inbox and explains the stale row', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final inbox = FakeInboxRemoteDataSource(
+      now: now,
+      seed: [
+        InboxNotification(
+          id: 'food-missing',
+          category: InboxCategory.food,
+          title: 'Cập nhật đơn hàng',
+          body: 'Nhấn để xem đơn',
+          read: false,
+          createdAt: now,
+          aggregateType: 'FoodOrder',
+          aggregateId: '30b21cb5-537c-4bbb-8694-ed99ff39da0a',
+          status: 'PREPARING',
+          path: '/customer/food/orders/30b21cb5-537c-4bbb-8694-ed99ff39da0a',
+        ),
+      ],
+    );
+    final food = FakeFoodClient();
+    await pumpSignedIn(
+      tester,
+      profile: customerProfile,
+      inboxRemote: inbox,
+      foodClient: food,
+    );
+    await tester.tap(navLabel('Tôi'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Thông báo'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Quán đang làm món'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('inbox-food-order-gone')), findsOneWidget);
+    expect(find.text('Quán đang làm món'), findsOneWidget);
+    expect(food.orderReads, ['30b21cb5-537c-4bbb-8694-ed99ff39da0a']);
   });
 
   testWidgets('bell badges follow the real unread count', (tester) async {

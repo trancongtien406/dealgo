@@ -11,11 +11,14 @@ import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/format/text_case.dart';
+import '../../../../core/motion/dealgo_sheet.dart';
 import '../../../food/domain/entities/food_models.dart';
 import '../../../identity/domain/auth_redirect.dart';
 import '../../../identity/domain/entities/auth_state.dart';
 import '../../../identity/presentation/cubit/auth_cubit.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
+import '../../domain/entities/merchant_menu_models.dart';
 
 String? merchantAccessToken(BuildContext context) {
   final auth = context.read<AuthCubit>().state;
@@ -425,15 +428,22 @@ enum MerchantChipTone { green, warning, neutral }
 
 /// Thin feature wrapper over [DealGoChip].
 class MerchantChip extends StatelessWidget {
-  const MerchantChip({required this.label, required this.tone, super.key});
+  const MerchantChip({
+    required this.label,
+    required this.tone,
+    this.leading,
+    super.key,
+  });
 
   final String label;
   final MerchantChipTone tone;
+  final Widget? leading;
 
   @override
   Widget build(BuildContext context) {
     return DealGoChip(
       label: label,
+      leading: leading,
       tone: switch (tone) {
         MerchantChipTone.green => DealGoChipTone.success,
         MerchantChipTone.warning => DealGoChipTone.warning,
@@ -617,4 +627,90 @@ class MerchantOptionTile extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<(String?,)?> showCategoryPickerSheet({
+  required BuildContext context,
+  required List<MerchantMenuCategory> categories,
+  required String? selectedId,
+}) {
+  final l10n = AppLocalizations.of(context);
+  return showDealGoSheet<(String?,)>(
+    context: context,
+    isScrollControlled: true,
+    builder: (sheetContext) => SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: DealGoSpacing.s16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: DealGoDimensions.pageGutter,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.merchantItemCategory,
+                      style: Theme.of(sheetContext).textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(DealGoIcons.close, size: 20),
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: DealGoSpacing.s8),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.5,
+              ),
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: DealGoDimensions.pageGutter,
+                    ),
+                    title: const Text('—'),
+                    trailing: selectedId == null
+                        ? const Icon(DealGoIcons.check, color: DealGoColors.primary)
+                        : null,
+                    onTap: () => Navigator.of(sheetContext).pop((null,)),
+                  ),
+                  for (final cat in categories)
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: DealGoDimensions.pageGutter,
+                      ),
+                      title: Text(
+                        capitalizeFirstLetter(cat.name),
+                        style: Theme.of(sheetContext).textTheme.bodyLarge?.copyWith(
+                          fontWeight: selectedId == cat.id
+                              ? FontWeight.w700
+                              : FontWeight.w400,
+                          color: selectedId == cat.id
+                              ? DealGoColors.primary
+                              : null,
+                        ),
+                      ),
+                      trailing: selectedId == cat.id
+                          ? const Icon(DealGoIcons.check, color: DealGoColors.primary)
+                          : null,
+                      onTap: () => Navigator.of(sheetContext).pop((cat.id,)),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }

@@ -45,17 +45,24 @@ class _MerchantProfilePageState extends State<MerchantProfilePage> {
   String? _notice;
   String? _error;
 
+  void _onFieldChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
-    _name.addListener(() => setState(() {}));
-    _minOrder.addListener(() => setState(() {}));
-    _description.addListener(() => setState(() {}));
+    _name.addListener(_onFieldChanged);
+    _minOrder.addListener(_onFieldChanged);
+    _description.addListener(_onFieldChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   @override
   void dispose() {
+    _name.removeListener(_onFieldChanged);
+    _minOrder.removeListener(_onFieldChanged);
+    _description.removeListener(_onFieldChanged);
     _name.dispose();
     _minOrder.dispose();
     _description.dispose();
@@ -370,11 +377,11 @@ class _MerchantProfilePageState extends State<MerchantProfilePage> {
         MerchantPanel(
           child: DealGoTextField(
             label: l10n.merchantProfileName,
+            hint: 'VD: Cơm Tấm Sài Gòn 1985...',
             fieldKey: const Key('merchant-profile-name'),
             controller: _name,
             maxLength: 120,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _save(),
+            textInputAction: TextInputAction.next,
             errorText: showNameError ? l10n.merchantProfileNameInvalid : null,
           ),
         ),
@@ -382,10 +389,12 @@ class _MerchantProfilePageState extends State<MerchantProfilePage> {
         MerchantPanel(
           child: DealGoTextField(
             label: l10n.merchantProfileDescription,
+            hint: 'VD: Chuyên các món cơm tấm truyền thống, sườn nướng...',
             fieldKey: const Key('merchant-profile-description'),
             controller: _description,
             maxLines: 4,
             maxLength: 500,
+            textInputAction: TextInputAction.next,
             textCapitalization: TextCapitalization.sentences,
           ),
         ),
@@ -393,9 +402,11 @@ class _MerchantProfilePageState extends State<MerchantProfilePage> {
         MerchantPanel(
           child: DealGoTextField(
             label: l10n.merchantStoreMinOrder,
+            hint: '0',
             fieldKey: const Key('merchant-profile-min-order'),
             controller: _minOrder,
             keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.done,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             errorText: _minOrderValue == null
                 ? l10n.merchantStoreMinOrderInvalid

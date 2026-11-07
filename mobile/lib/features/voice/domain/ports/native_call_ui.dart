@@ -108,6 +108,9 @@ abstract interface class NativeCallUi {
   /// Whether the system call screen is already ringing [callId] (so the
   /// in-app ringtone would ring a second time).
   Future<bool> isRinging(String callId);
+
+  /// Call IDs currently ringing (unanswered) on the system call screen.
+  Future<List<String>> ringingCalls();
 }
 
 /// Web, tests and mock builds.
@@ -143,4 +146,7 @@ class NoopNativeCallUi implements NativeCallUi {
 
   @override
   Future<bool> isRinging(String callId) async => false;
+
+  @override
+  Future<List<String>> ringingCalls() async => const [];
 }

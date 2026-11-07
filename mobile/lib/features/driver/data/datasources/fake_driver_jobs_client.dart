@@ -31,6 +31,7 @@ class FakeDriverJobsClient implements DriverJobsClient {
 
   final openCalls = <String>[];
   final readyCalls = <String>[];
+  final dismissCalls = <String>[];
   final offerCalls = <SubmitRideOfferRequest>[];
   final claimCalls = <String>[];
   final rideActions = <({String rideId, RideDriverAction action})>[];
@@ -61,6 +62,17 @@ class FakeDriverJobsClient implements DriverJobsClient {
       throw error;
     }
     return List.unmodifiable(openRides);
+  }
+
+  @override
+  Future<void> dismissRide({
+    required String accessToken,
+    required String rideId,
+  }) async {
+    dismissCalls.add(rideId);
+    openRides = openRides
+        .where((ride) => ride.id != rideId)
+        .toList(growable: false);
   }
 
   @override

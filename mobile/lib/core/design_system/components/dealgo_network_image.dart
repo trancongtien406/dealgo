@@ -9,11 +9,7 @@ import 'dealgo_skeleton.dart';
 
 /// Shimmering placeholder shown while a network image is loading.
 class DealGoImagePlaceholder extends StatelessWidget {
-  const DealGoImagePlaceholder({
-    this.width,
-    this.height,
-    super.key,
-  });
+  const DealGoImagePlaceholder({this.width, this.height, super.key});
 
   final double? width;
   final double? height;
@@ -24,10 +20,7 @@ class DealGoImagePlaceholder extends StatelessWidget {
       builder: (context, constraints) {
         final w = width ?? constraints.maxWidth;
         final h = height ?? constraints.maxHeight;
-        final minSide = math.min(
-          w.isFinite ? w : 64.0,
-          h.isFinite ? h : 64.0,
-        );
+        final minSide = math.min(w.isFinite ? w : 64.0, h.isFinite ? h : 64.0);
         final showIcon = minSide >= 44;
         final iconSize = (minSide * 0.28).clamp(16.0, 28.0);
         return DealGoShimmer(
@@ -52,11 +45,7 @@ class DealGoImagePlaceholder extends StatelessWidget {
 
 /// Distinct visual fallback when a network image fails to load (404 / offline).
 class DealGoImageFallback extends StatelessWidget {
-  const DealGoImageFallback({
-    this.width,
-    this.height,
-    super.key,
-  });
+  const DealGoImageFallback({this.width, this.height, super.key});
 
   final double? width;
   final double? height;
@@ -67,10 +56,7 @@ class DealGoImageFallback extends StatelessWidget {
       builder: (context, constraints) {
         final w = width ?? constraints.maxWidth;
         final h = height ?? constraints.maxHeight;
-        final minSide = math.min(
-          w.isFinite ? w : 64.0,
-          h.isFinite ? h : 64.0,
-        );
+        final minSide = math.min(w.isFinite ? w : 64.0, h.isFinite ? h : 64.0);
         final showBadge = minSide >= 36;
         final iconSize = (minSide * 0.26).clamp(14.0, 24.0);
         return DecoratedBox(
@@ -78,10 +64,7 @@ class DealGoImageFallback extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                DealGoColors.skeletonBase,
-                DealGoColors.lavender,
-              ],
+              colors: [DealGoColors.skeletonBase, DealGoColors.lavender],
             ),
           ),
           child: showBadge

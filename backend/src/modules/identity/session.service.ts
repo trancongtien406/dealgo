@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { AppEnv } from '../../platform/config/env.js';
 import { authError } from './auth-error.js';
-import { IDENTITY_REPOSITORY } from './identity.constants.js';
+import { DRIVER_PRESENCE_REPOSITORY, IDENTITY_REPOSITORY } from './identity.constants.js';
+import type { DriverPresenceRepository } from './driver-presence.repository.js';
 import {
   sessionChannel,
   storedChannel,
@@ -43,6 +44,9 @@ export class SessionService {
     @Inject(IDENTITY_REPOSITORY)
     private readonly repository: IdentityRepository,
     private readonly config: ConfigService<AppEnv, true>,
+    @Optional()
+    @Inject(DRIVER_PRESENCE_REPOSITORY)
+    private readonly driverPresence?: DriverPresenceRepository,
   ) {}
 
   async issue(
@@ -148,7 +152,11 @@ export class SessionService {
   }
 
   async revoke(sessionId: string): Promise<{ revoked: true }> {
+    const session = await this.repository.findSessionById(sessionId);
     await this.repository.revokeSession(sessionId, 'USER', new Date());
+    if (session) {
+      await this.cleanupIfNoActiveSessions(session.userId);
+    }
     return { revoked: true };
   }
 
@@ -161,7 +169,20 @@ export class SessionService {
       return { revoked: false };
     }
     await this.repository.revokeSession(session.id, 'USER', new Date());
+    await this.cleanupIfNoActiveSessions(session.userId);
     return { revoked: true };
+  }
+
+  private async cleanupIfNoActiveSessions(userId: string): Promise<void> {
+    try {
+      const remaining = await this.repository.listActiveSessions(userId);
+      if (remaining.length === 0 && this.driverPresence) {
+        const presence = await this.driverPresence.findByUserId(userId);
+        if (presence?.online) {
+          await this.driverPresence.upsert(userId, { online: false });
+        }
+      }
+    } catch (_) {}
   }
 
   private toResult(

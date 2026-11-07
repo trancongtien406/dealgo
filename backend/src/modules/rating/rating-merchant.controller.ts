@@ -16,9 +16,12 @@ export class RatingMerchantController {
   constructor(private readonly ratings: RatingService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Reviews of the signed-in merchant store, newest first (hidden ones flagged)' })
+  @ApiOperation({
+    summary:
+      'Reviews of the signed-in merchant store with filters (stars, reply state, comment, visibility, tag, search, date range, sort)',
+  })
   list(@CurrentActor() actor: RequestActor, @Query() query: MerchantReviewsQueryDto) {
-    return this.ratings.merchantReviews(actor, query.page ?? 1);
+    return this.ratings.merchantReviews(actor, query);
   }
 
   @Put(':id/reply')

@@ -10,6 +10,7 @@ import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/network/request_failure.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/ride_money.dart';
@@ -160,7 +161,7 @@ class _RideOfferDetailViewState extends State<_RideOfferDetailView> {
             DealGoAppHeader(title: l10n.rideOfferDetailTitle, onBack: _back),
             Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const DealGoSkeletonList(itemCount: 3)
                   : _failure != null && offer == null
                   ? DealGoStateView.failure(
                       context,

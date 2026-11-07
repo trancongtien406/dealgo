@@ -42,7 +42,11 @@ class AuthScaffold extends StatelessWidget {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isTablet = screenWidth >= 600;
 
-    Widget buildHeader({EdgeInsets padding = const EdgeInsets.symmetric(horizontal: DealGoSpacing.s4)}) {
+    Widget buildHeader({
+      EdgeInsets padding = const EdgeInsets.symmetric(
+        horizontal: DealGoSpacing.s4,
+      ),
+    }) {
       return SizedBox(
         height: DealGoDimensions.headerHeight,
         child: Padding(

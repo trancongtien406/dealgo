@@ -128,6 +128,7 @@ class _FoodTrackingView extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocListener<FoodTrackingCubit, FoodTrackingState>(
       listenWhen: (previous, next) {
+        if (next is FoodTrackingMissing) return true;
         final before = previous.order?.stage;
         final after = next.order?.stage;
         if (before == null || after == null || before == after) {
@@ -141,6 +142,15 @@ class _FoodTrackingView extends StatelessWidget {
                 after == FoodTrackingStage.failed);
       },
       listener: (context, state) {
+        if (state is FoodTrackingMissing) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(AppLocalizations.of(context).apiErrNotFound),
+            ),
+          );
+          context.go('/customer/shop');
+          return;
+        }
         final order = state.order;
         if (order == null) return;
         final l10n = AppLocalizations.of(context);
@@ -503,9 +513,11 @@ class _FoodLive extends StatelessWidget {
               const SizedBox(height: DealGoSpacing.s8),
               for (final line in lines.take(shownLines))
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
                     children: [
+                      FoodThumb(size: 28, imageUrl: line.imageUrl),
+                      const SizedBox(width: DealGoSpacing.s8),
                       Text(
                         '${line.quantity}×',
                         style: textTheme.bodyMedium?.copyWith(

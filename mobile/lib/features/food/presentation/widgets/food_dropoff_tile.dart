@@ -324,11 +324,7 @@ class _FareProblem extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(
-              DealGoIcons.alert,
-              size: 18,
-              color: DealGoColors.danger,
-            ),
+            const Icon(DealGoIcons.alert, size: 18, color: DealGoColors.danger),
             const SizedBox(width: DealGoSpacing.s8),
             Expanded(
               child: Text(

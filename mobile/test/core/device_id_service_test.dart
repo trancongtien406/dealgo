@@ -1,5 +1,6 @@
 import 'package:dealgo/core/device/device_id_service.dart';
 import 'package:dealgo/core/network/dealgo_dio.dart';
+import 'package:dealgo/features/account_settings/presentation/session_device.dart';
 import 'package:dealgo/features/identity/data/datasources/dio_identity_remote_datasource.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -85,6 +86,19 @@ void main() {
 
       expect(adapter.lastOptions, isNotNull);
       expect(adapter.lastOptions!.headers['x-device-id'], equals('test-device-uuid-999'));
+      final deviceLabel = adapter.lastOptions!.headers['x-device-label'] as String?;
+      expect(deviceLabel, isNotNull);
+      // Valid HTTP header must only have printable ASCII 32..126
+      for (final codeUnit in deviceLabel!.codeUnits) {
+        expect(codeUnit >= 32 && codeUnit <= 126, isTrue);
+      }
+    });
+
+    test('toHeaderSafeAscii strips non-ascii and replaces middle dot', () {
+      expect(toHeaderSafeAscii('iPhone 17 Pro · DealGo'), 'iPhone 17 Pro - DealGo');
+      expect(toHeaderSafeAscii('Điện thoại của Tiến · DealGo'), 'in thoi ca Tin - DealGo');
+      expect(toHeaderSafeAscii('📱 My Device ⚡'), 'My Device');
+      expect(toHeaderSafeAscii(''), 'DealGo-App');
     });
   });
 

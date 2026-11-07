@@ -9,6 +9,7 @@ class MerchantKitchenLine {
     required this.unitPriceVnd,
     this.options = '',
     this.note,
+    this.imageUrl,
   });
 
   /// Server line id — needed to edit the order.
@@ -22,6 +23,9 @@ class MerchantKitchenLine {
 
   /// Customer note for this dish ("ít cay, không hành"); null = none.
   final String? note;
+
+  /// Cover image of the dish.
+  final String? imageUrl;
 }
 
 /// Builds kitchen display lines from an order detail returned by the API.
@@ -39,6 +43,7 @@ List<MerchantKitchenLine> kitchenLinesFromDetail(FoodOrderDetail detail) {
         unitPriceVnd: lines[i].unitPriceVnd,
         options: lines[i].optionsSummary,
         note: lines[i].note,
+        imageUrl: lines[i].imageUrl,
       ),
   ];
 }

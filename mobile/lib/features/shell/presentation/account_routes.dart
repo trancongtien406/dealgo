@@ -18,6 +18,8 @@ abstract final class AccountRoutes {
 
   static String sessions(String shellPath) => '$shellPath/sessions';
 
+  static String passkeys(String shellPath) => '$shellPath/passkeys';
+
   static String changePassword(String shellPath) =>
       '$shellPath/change-password';
 

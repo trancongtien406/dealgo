@@ -193,9 +193,8 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
                         ),
                         child: Text(
                           l10n.foodDiscoverySearchHint,
-                          style: DealGoType.body(textTheme).copyWith(
-                            color: DealGoColors.textSecondary,
-                          ),
+                          style: DealGoType.body(textTheme)
+                              .copyWith(color: DealGoColors.textSecondary),
                         ),
                       ),
                     ),
@@ -249,11 +248,7 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
                       selected: true,
                       onTap: _openFilters,
                     ),
-                  Container(
-                    width: 1,
-                    height: 18,
-                    color: DealGoColors.border,
-                  ),
+                  Container(width: 1, height: 18, color: DealGoColors.border),
                   FoodFilterPill(
                     key: const Key('food-category-filter-open'),
                     label: l10n.foodFilterOpenNow,
@@ -321,72 +316,77 @@ class _FoodCategoryViewState extends State<_FoodCategoryView> {
             Expanded(
               child: DealGoRefresh(
                 onRefresh: _reload,
-                child: ListView(
-                  controller: _scroll,
-                  padding: const EdgeInsets.fromLTRB(
-                    DealGoDimensions.pageGutter,
-                    DealGoSpacing.s12,
-                    DealGoDimensions.pageGutter,
-                    DealGoSpacing.s24,
-                  ),
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            l10n.foodCategoryAroundYou,
-                            style: textTheme.titleMedium,
-                          ),
-                        ),
-                        if (discovery is FoodDiscoveryReady)
-                          Text(
-                            l10n.foodCategoryAroundHint(discovery.total),
-                            style: textTheme.bodySmall?.copyWith(
-                              color: DealGoColors.textSecondary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: DealGoSpacing.s16),
-                    if (discovery is FoodDiscoveryFailed)
-                      DealGoStateView.failure(
+                child: discovery is FoodDiscoveryFailed
+                    ? DealGoStateView.failure(
                         context,
                         onRetry: _reload,
                         cause: discovery.message.error,
                         message: discovery.message.resolve(l10n),
-                        compact: true,
                       )
-                    else if (loading)
-                      const DealGoSkeletonList(itemCount: 4)
-                    else if (stores.isEmpty)
-                      DealGoStateView(
+                    : loading
+                    ? const DealGoSkeletonList(
+                        itemCount: 4,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: DealGoDimensions.pageGutter,
+                          vertical: DealGoSpacing.s12,
+                        ),
+                      )
+                    : stores.isEmpty
+                    ? DealGoStateView(
                         key: const Key('food-category-empty'),
                         art: DealGoStateArt.noSearch,
                         title: _emptyTitle(l10n, discovery),
-                        compact: true,
                       )
-                    else
-                      for (final (index, store) in stores.indexed) ...[
-                        DealGoStaggerIn(
-                          key: ValueKey(store.id),
-                          index: index,
-                          child: _StoreRow(
-                            store: store,
-                            rating: ratings[store.id],
-                            onTap: () =>
-                                context.push(FoodRoutes.store(store.id)),
-                          ),
+                    : ListView(
+                        controller: _scroll,
+                        padding: const EdgeInsets.fromLTRB(
+                          DealGoDimensions.pageGutter,
+                          DealGoSpacing.s12,
+                          DealGoDimensions.pageGutter,
+                          DealGoSpacing.s24,
                         ),
-                        const SizedBox(height: DealGoSpacing.s12),
-                      ],
-                    FoodFeedFooter(
-                      state: discovery is FoodDiscoveryReady ? discovery : null,
-                      onRetry: () =>
-                          context.read<FoodDiscoveryCubit>().loadMore(),
-                    ),
-                  ],
-                ),
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  l10n.foodCategoryAroundYou,
+                                  style: textTheme.titleMedium,
+                                ),
+                              ),
+                              if (discovery is FoodDiscoveryReady)
+                                Text(
+                                  l10n.foodCategoryAroundHint(discovery.total),
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: DealGoColors.textSecondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: DealGoSpacing.s16),
+                          for (final (index, store) in stores.indexed) ...[
+                            DealGoStaggerIn(
+                              key: ValueKey(store.id),
+                              index: index,
+                              child: _StoreRow(
+                                store: store,
+                                rating: ratings[store.id],
+                                onTap: () =>
+                                    context.push(FoodRoutes.store(store.id)),
+                              ),
+                            ),
+                            const SizedBox(height: DealGoSpacing.s12),
+                          ],
+                          FoodFeedFooter(
+                            state: discovery is FoodDiscoveryReady
+                                ? discovery
+                                : null,
+                            onRetry: () =>
+                                context.read<FoodDiscoveryCubit>().loadMore(),
+                          ),
+                        ],
+                      ),
               ),
             ),
           ],

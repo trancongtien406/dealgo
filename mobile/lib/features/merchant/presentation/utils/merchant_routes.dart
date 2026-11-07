@@ -14,6 +14,7 @@ abstract final class MerchantRoutes {
   /// S015 picker inside the merchant shell (merchant-only accounts cannot open `/customer/*`).
   static const locationPick = '/merchant/settings/location/pick';
   static const categories = '/merchant/products/categories';
+  static const itemNew = '/merchant/products/new';
   static const history = '/merchant/history';
 
   /// M040 store-funded offers; M041 creates one.

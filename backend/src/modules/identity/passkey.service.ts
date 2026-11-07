@@ -449,6 +449,42 @@ export class PasskeyService {
     }
   }
 
+  /** Passkeys on the account for the security page (no key material). */
+  async listForUser(userId: string) {
+    const rows = await this.repository.listPasskeys(userId);
+    return rows
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .map((row) => ({
+        id: row.id,
+        createdAt: row.createdAt.toISOString(),
+        deviceType: row.deviceType,
+        backedUp: row.backedUp,
+        transports: row.transports,
+      }));
+  }
+
+  /**
+   * Removes a passkey. The last one cannot go when it is the only way to sign
+   * in (no verified phone or email), so the account is never locked out.
+   */
+  async remove(userId: string, id: string): Promise<{ removed: true }> {
+    const user = await this.repository.findUserById(userId);
+    const passkeys = await this.repository.listPasskeys(userId);
+    if (!user || !passkeys.some((p) => p.id === id)) {
+      throw authError(404, 'AUTH_PASSKEY_NOT_FOUND', 'Passkey not found');
+    }
+    const hasOtherLogin = Boolean(user.phoneVerifiedAt || user.emailVerifiedAt);
+    if (passkeys.length <= 1 && !hasOtherLogin) {
+      throw authError(
+        409,
+        'AUTH_PASSKEY_LAST_CREDENTIAL',
+        'The last sign-in method cannot be removed',
+      );
+    }
+    await this.repository.deletePasskey(userId, id);
+    return { removed: true };
+  }
+
   private async requireVerifiedUser(userId: string) {
     const user = await this.repository.findUserById(userId);
     // Sign-in methods are independently toggleable (DEC-PROD-052): a verified phone, a verified

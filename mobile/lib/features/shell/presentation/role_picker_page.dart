@@ -53,123 +53,125 @@ class _RolePickerPageState extends State<RolePickerPage> {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 520),
                 child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                DealGoAppHeader(
-                  title: l10n.accountRoles,
-                  showBack: canPop,
-                  onBack: canPop ? () => context.pop() : null,
-                  applySafeArea: false,
-                  backgroundColor: Colors.transparent,
-                  actions: IconButton(
-                    tooltip: l10n.authHelp,
-                    onPressed: () => _showHelp(context),
-                    icon: const Icon(
-                      DealGoIcons.help,
-                      color: DealGoColors.primary,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    DealGoAppHeader(
+                      title: l10n.accountRoles,
+                      showBack: canPop,
+                      onBack: canPop ? () => context.pop() : null,
+                      applySafeArea: false,
+                      backgroundColor: Colors.transparent,
+                      actions: IconButton(
+                        tooltip: l10n.authHelp,
+                        onPressed: () => _showHelp(context),
+                        icon: const Icon(
+                          DealGoIcons.help,
+                          color: DealGoColors.primary,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(
-                      DealGoDimensions.pageGutter,
-                      DealGoSpacing.s16,
-                      DealGoDimensions.pageGutter,
-                      DealGoSpacing.s8,
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(
+                          DealGoDimensions.pageGutter,
+                          DealGoSpacing.s16,
+                          DealGoDimensions.pageGutter,
+                          DealGoSpacing.s8,
+                        ),
+                        children: [
+                          Text.rich(
+                            TextSpan(
+                              style: textTheme.headlineMedium,
+                              children: [
+                                TextSpan(text: l10n.rolePickerPrefix),
+                                TextSpan(
+                                  text: 'Deal',
+                                  style: textTheme.headlineMedium?.copyWith(
+                                    color: DealGoColors.primary,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: 'Go',
+                                  style: textTheme.headlineMedium?.copyWith(
+                                    color: DealGoColors.brandGreen,
+                                  ),
+                                ),
+                                TextSpan(text: l10n.rolePickerSuffix),
+                              ],
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: DealGoSpacing.s24),
+                          for (final mode in modes) ...[
+                            _RoleCard(
+                              mode: mode,
+                              selected: mode.role == _selected,
+                              onTap: () =>
+                                  setState(() => _selected = mode.role),
+                            ),
+                            const SizedBox(height: DealGoSpacing.s12),
+                          ],
+                          if (onboardingRoles.isNotEmpty) ...[
+                            const SizedBox(height: DealGoSpacing.s16),
+                            Divider(height: 1, color: DealGoColors.border),
+                            const SizedBox(height: DealGoSpacing.s16),
+                            Text(
+                              l10n.rolePickerPartnerSection,
+                              style: textTheme.labelLarge?.copyWith(
+                                color: DealGoColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: DealGoSpacing.s12),
+                            for (final role in onboardingRoles) ...[
+                              _OnboardingCard(
+                                role: role,
+                                grantStatus: profile?.grantStatus(role),
+                                onTap: () =>
+                                    context.push(_onboardingPath(role)),
+                              ),
+                              const SizedBox(height: DealGoSpacing.s8),
+                            ],
+                          ],
+                        ],
+                      ),
                     ),
-                    children: [
-                      Text.rich(
-                        TextSpan(
-                          style: textTheme.headlineMedium,
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        DealGoDimensions.pageGutter,
+                        DealGoSpacing.s8,
+                        DealGoDimensions.pageGutter,
+                        DealGoSpacing.s16,
+                      ),
+                      child: IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            TextSpan(text: l10n.rolePickerPrefix),
-                            TextSpan(
-                              text: 'Deal',
-                              style: textTheme.headlineMedium?.copyWith(
-                                color: DealGoColors.primary,
+                            Expanded(
+                              child: DealGoSecondaryButton(
+                                label: l10n.rolePickerLearnMore,
+                                onPressed: () => _showLearnMore(context),
                               ),
                             ),
-                            TextSpan(
-                              text: 'Go',
-                              style: textTheme.headlineMedium?.copyWith(
-                                color: DealGoColors.brandGreen,
+                            const SizedBox(width: DealGoSpacing.s12),
+                            Expanded(
+                              child: DealGoPrimaryButton(
+                                label: l10n.actionContinue,
+                                trailingIcon: DealGoIcons.arrowRight,
+                                onPressed: () => context.go(_selected.homePath),
                               ),
                             ),
-                            TextSpan(text: l10n.rolePickerSuffix),
                           ],
                         ),
-                        textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: DealGoSpacing.s24),
-                      for (final mode in modes) ...[
-                        _RoleCard(
-                          mode: mode,
-                          selected: mode.role == _selected,
-                          onTap: () => setState(() => _selected = mode.role),
-                        ),
-                        const SizedBox(height: DealGoSpacing.s12),
-                      ],
-                      if (onboardingRoles.isNotEmpty) ...[
-                        const SizedBox(height: DealGoSpacing.s16),
-                        Divider(height: 1, color: DealGoColors.border),
-                        const SizedBox(height: DealGoSpacing.s16),
-                        Text(
-                          l10n.rolePickerPartnerSection,
-                          style: textTheme.labelLarge?.copyWith(
-                            color: DealGoColors.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: DealGoSpacing.s12),
-                        for (final role in onboardingRoles) ...[
-                          _OnboardingCard(
-                            role: role,
-                            grantStatus: profile?.grantStatus(role),
-                            onTap: () => context.push(_onboardingPath(role)),
-                          ),
-                          const SizedBox(height: DealGoSpacing.s8),
-                        ],
-                      ],
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    DealGoDimensions.pageGutter,
-                    DealGoSpacing.s8,
-                    DealGoDimensions.pageGutter,
-                    DealGoSpacing.s16,
-                  ),
-                  child: IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: DealGoSecondaryButton(
-                            label: l10n.rolePickerLearnMore,
-                            onPressed: () => _showLearnMore(context),
-                          ),
-                        ),
-                        const SizedBox(width: DealGoSpacing.s12),
-                        Expanded(
-                          child: DealGoPrimaryButton(
-                            label: l10n.actionContinue,
-                            trailingIcon: DealGoIcons.arrowRight,
-                            onPressed: () => context.go(_selected.homePath),
-                          ),
-                        ),
-                      ],
                     ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
+        ],
       ),
-    ],
-  ),
-);
+    );
   }
 
   void _showHelp(BuildContext context) {

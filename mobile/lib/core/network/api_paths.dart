@@ -37,6 +37,9 @@ abstract final class ApiPaths {
     return '/v1/auth/email/verifications/${Uri.encodeComponent(verificationId)}/confirm';
   }
 
+  static const passkeys = '/v1/auth/passkeys';
+  static String passkey(String id) =>
+      '/v1/auth/passkeys/${Uri.encodeComponent(id)}';
   static const passkeyRegistrationOptions =
       '/v1/auth/passkeys/registration/options';
   static const passkeyRegistrationVerify =
@@ -205,6 +208,10 @@ abstract final class ApiPaths {
 
   static String ride(String rideId) {
     return '/v1/rides/${Uri.encodeComponent(rideId)}';
+  }
+
+  static String dismissRide(String rideId) {
+    return '/v1/rides/${Uri.encodeComponent(rideId)}/dismiss';
   }
 
   static String rideOffers(String rideId) {

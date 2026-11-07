@@ -7,6 +7,7 @@ import '../../../rating/domain/service_rating.dart';
 import '../../../rating/presentation/rate_service_card.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_secondary_button.dart';
+import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../utils/ride_routes.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/network/request_failure.dart';
@@ -202,7 +203,7 @@ class _RideReceiptPageState extends State<_RideReceiptView> {
   Widget _body(RideView? ride, TextTheme textTheme) {
     final l10n = AppLocalizations.of(context);
     if (_loading && ride == null) {
-      return const Center(child: CircularProgressIndicator());
+      return const DealGoSkeletonList(itemCount: 4);
     }
     if (_failure != null && ride == null) {
       return DealGoStateView.failure(

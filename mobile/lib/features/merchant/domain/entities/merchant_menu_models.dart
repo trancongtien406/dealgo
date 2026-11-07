@@ -1,3 +1,20 @@
+/// M027 staged photo payload sent inside the item create/update form.
+class MerchantItemImageUpload {
+  const MerchantItemImageUpload({
+    required this.contentBase64,
+    this.contentType,
+  });
+
+  final String contentBase64;
+  final String? contentType;
+
+  Map<String, Object?> toJson() => {
+    'contentBase64': contentBase64,
+    if (contentType != null && contentType!.trim().isNotEmpty)
+      'contentType': contentType!.trim(),
+  };
+}
+
 /// M025 store menu category (DEC-PROD-039).
 class MerchantMenuCategory {
   const MerchantMenuCategory({
@@ -25,6 +42,7 @@ class MerchantHistoryOrder {
     required this.createdAt,
     required this.finishedAt,
     this.customerName,
+    this.customerAvatarUrl,
     required this.lineSummary,
   });
 
@@ -35,6 +53,7 @@ class MerchantHistoryOrder {
   final DateTime createdAt;
   final DateTime finishedAt;
   final String? customerName;
+  final String? customerAvatarUrl;
   final String lineSummary;
 }
 

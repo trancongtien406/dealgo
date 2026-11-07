@@ -84,6 +84,7 @@ dependencies:
   flutter_native_contact_picker: ^0.0.13
   cached_network_image: ^4.0.6
   flutter_cache_manager: ^3.5.0
+  device_info_plus: ^13.3.0
 dependency_overrides:
   # Patched 0.11.1: corrects preview/photo rotation for the iPhone 17 front camera.
   camera_avfoundation:

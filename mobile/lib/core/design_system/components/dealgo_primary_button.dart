@@ -18,6 +18,7 @@ class DealGoPrimaryButton extends StatefulWidget {
     this.leadingIcon,
     this.haptic = true,
     this.compact = false,
+    this.fullWidth = false,
     super.key,
   });
 
@@ -31,6 +32,9 @@ class DealGoPrimaryButton extends StatefulWidget {
 
   /// Slightly shorter CTA for dense bottom sheets (still ≥ 48 logical px).
   final bool compact;
+
+  /// Expands horizontally to fill the parent container's available width.
+  final bool fullWidth;
 
   @override
   State<DealGoPrimaryButton> createState() => _DealGoPrimaryButtonState();
@@ -67,7 +71,9 @@ class _DealGoPrimaryButtonState extends State<DealGoPrimaryButton> {
         elevation: const WidgetStatePropertyAll(0),
         minimumSize: WidgetStatePropertyAll(
           Size(
-            DealGoDimensions.minTapTarget,
+            widget.fullWidth
+                ? double.infinity
+                : DealGoDimensions.minTapTarget,
             widget.compact ? 48 : DealGoDimensions.buttonMinHeight,
           ),
         ),
@@ -134,19 +140,22 @@ class _DealGoPrimaryButtonState extends State<DealGoPrimaryButton> {
         scale: _pressed && !reduced ? 0.98 : 1,
         duration: DealGoMotion.fast,
         curve: DealGoMotion.standard,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: radius,
-            color: disabled
-                ? DealGoColors.primary.withValues(alpha: 0.38)
-                : (_pressed
-                      ? DealGoColors.primaryPressed
-                      : DealGoColors.primary),
-            boxShadow: disabled || widget.isLoading
-                ? null
-                : DealGoShadows.button,
+        child: SizedBox(
+          width: widget.fullWidth ? double.infinity : null,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: radius,
+              color: disabled
+                  ? DealGoColors.primary.withValues(alpha: 0.38)
+                  : (_pressed
+                        ? DealGoColors.primaryPressed
+                        : DealGoColors.primary),
+              boxShadow: disabled || widget.isLoading
+                  ? null
+                  : DealGoShadows.button,
+            ),
+            child: button,
           ),
-          child: button,
         ),
       ),
     );

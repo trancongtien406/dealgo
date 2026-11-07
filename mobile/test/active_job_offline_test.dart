@@ -144,6 +144,16 @@ void main() {
       expect(store.value, isNull);
     });
 
+    test('clearIfMatches does not erase a newer job', () async {
+      await cache.recordJob(_ride(), terminal: false, assignedDriverId: null);
+      await cache.clearIfMatches('old-id');
+      expect((await cache.lookup())?.id, 'r1');
+
+      await cache.clearIfMatches('r1');
+      expect(await cache.lookup(), isNull);
+      expect(store.value, isNull);
+    });
+
     test('survives a JSON round trip', () {
       final snapshot = _ride().withDriver(_driver);
       final decoded = ActiveJobSnapshot.fromJson(snapshot.toJson());

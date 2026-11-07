@@ -24,7 +24,10 @@ import { RideLedger } from './ride-ledger.js';
 import type { DriverJobCounts } from '../../shared/driver-job-counts.js';
 import type { CompletionHook } from '../../shared/tx/completion-hook.js';
 import { RideRuleError } from './ride.error.js';
-import { VoucherRejectedError, type VoucherRedeemer } from '../promotion/promotion-redemption.js';
+import {
+  VoucherRejectedError,
+  type VoucherRedeemer,
+} from '../promotion/promotion-redemption.js';
 
 export type OpsRidePage = {
   items: RideSnapshot[];
@@ -41,10 +44,16 @@ export type OpsInterveneResult = {
  * repository's transaction handle (Prisma tx; undefined in memory). Runs on idempotent
  * replays too, so it must be idempotent; a throw rolls the ride back.
  */
-export type RideCreateHook = (ctx: { tx: unknown; rideId: string }) => Promise<void>;
+export type RideCreateHook = (ctx: {
+  tx: unknown;
+  rideId: string;
+}) => Promise<void>;
 
 export interface RideRepository {
-  create(input: CreateRideInput, withinCreate?: RideCreateHook): Promise<RideSnapshot>;
+  create(
+    input: CreateRideInput,
+    withinCreate?: RideCreateHook,
+  ): Promise<RideSnapshot>;
   findById(id: string, now: Date): Promise<RideSnapshot | null>;
   /** t82u: priced road distance shown to drivers (stored beside the ride, outside the ledger). */
   setRouteDistanceKm?(rideId: string, km: number): Promise<void>;
@@ -56,11 +65,29 @@ export interface RideRepository {
     vehicleClassCode?: string,
     area?: GeoBox,
   ): Promise<OpenRideListing[]>;
+  dismissRequest(
+    rideId: string,
+    driverId: string,
+    dismissedAt: Date,
+  ): Promise<void>;
+  dismissedRequestIds(
+    driverId: string,
+    rideIds: readonly string[],
+  ): Promise<Set<string>>;
+  undismissedDriverIds(
+    rideId: string,
+    driverIds: readonly string[],
+  ): Promise<string[]>;
   listPage(
     page: number,
     limit: number,
     now: Date,
-    filter?: { status?: string; q?: string; zone?: string; serviceType?: string },
+    filter?: {
+      status?: string;
+      q?: string;
+      zone?: string;
+      serviceType?: string;
+    },
   ): Promise<OpsRidePage>;
   listForCustomer(
     customerId: string,
@@ -69,15 +96,26 @@ export interface RideRepository {
     now: Date,
   ): Promise<OpsRidePage>;
   /** COMPLETED/CANCELLED rides still assigned to the driver, newest updatedAt first. */
-  listFinishedForDriver(driverId: string, window: DriverHistoryWindow): Promise<RideSnapshot[]>;
+  listFinishedForDriver(
+    driverId: string,
+    window: DriverHistoryWindow,
+  ): Promise<RideSnapshot[]>;
   /** Ride ids assigned to the driver in one of [statuses] (live location fan-out). */
-  listIdsForDriverInStatuses?(driverId: string, statuses: readonly string[]): Promise<string[]>;
+  listIdsForDriverInStatuses?(
+    driverId: string,
+    statuses: readonly string[],
+  ): Promise<string[]>;
   /** Customer's ride ids in one of [statuses], newest first (relaunch resume, DEC-PROD-057). */
-  listIdsForCustomerInStatuses?(customerId: string, statuses: readonly string[]): Promise<string[]>;
+  listIdsForCustomerInStatuses?(
+    customerId: string,
+    statuses: readonly string[],
+  ): Promise<string[]>;
   /** Times of customer cancellations after a driver was assigned, since `since`. */
   customerCancelTimes(customerId: string, since: Date): Promise<Date[]>;
   /** Lifetime COMPLETED / terminal ride counts per assigned driver (Admin stats). */
-  countFinishedForDrivers(driverIds: readonly string[]): Promise<Map<string, DriverJobCounts>>;
+  countFinishedForDrivers(
+    driverIds: readonly string[],
+  ): Promise<Map<string, DriverJobCounts>>;
   offer(input: OfferInput): Promise<RideSnapshot>;
   select(input: SelectInput): Promise<RideSnapshot>;
   cancel(input: CancelInput): Promise<RideSnapshot>;
@@ -98,7 +136,10 @@ export interface RideRepository {
    * `onCompleted` runs inside the completion transaction (ledger + earnings); if it throws,
    * the ride stays IN_PROGRESS.
    */
-  complete(input: DriverLifecycleInput, onCompleted?: CompletionHook<RideSnapshot>): Promise<RideSnapshot>;
+  complete(
+    input: DriverLifecycleInput,
+    onCompleted?: CompletionHook<RideSnapshot>,
+  ): Promise<RideSnapshot>;
   expireDue(now: Date, limit?: number): Promise<string[]>;
   /** Customer raises the bid while negotiating. */
   raiseFare(input: RaiseFareInput): Promise<RideSnapshot>;
@@ -130,11 +171,15 @@ export interface RideRepository {
 
 export class MemoryRideRepository implements RideRepository {
   private readonly ledger = new RideLedger();
+  private readonly requestDismissals = new Set<string>();
   private tail: Promise<void> = Promise.resolve();
 
   constructor(private readonly vouchers?: VoucherRedeemer) {}
 
-  create(input: CreateRideInput, withinCreate?: RideCreateHook): Promise<RideSnapshot> {
+  create(
+    input: CreateRideInput,
+    withinCreate?: RideCreateHook,
+  ): Promise<RideSnapshot> {
     return this.run(async () => {
       const ride = finish(this.ledger.create(input));
       if (withinCreate) {
@@ -169,15 +214,53 @@ export class MemoryRideRepository implements RideRepository {
     vehicleClassCode?: string,
     area?: GeoBox,
   ): Promise<OpenRideListing[]> {
-    const rows = await this.run(() => this.ledger.listOpen(now, limit, vehicleClassCode, area));
-    return rows.map((row) => ({ ...row, routeDistanceKm: this.routeKm.get(row.id) ?? null }));
+    const rows = await this.run(() =>
+      this.ledger.listOpen(now, limit, vehicleClassCode, area),
+    );
+    return rows.map((row) => ({
+      ...row,
+      routeDistanceKm: this.routeKm.get(row.id) ?? null,
+    }));
+  }
+
+  async dismissRequest(
+    rideId: string,
+    driverId: string,
+    _dismissedAt: Date,
+  ): Promise<void> {
+    this.requestDismissals.add(`${rideId}:${driverId}`);
+  }
+
+  async dismissedRequestIds(
+    driverId: string,
+    rideIds: readonly string[],
+  ): Promise<Set<string>> {
+    return new Set(
+      rideIds.filter((rideId) =>
+        this.requestDismissals.has(`${rideId}:${driverId}`),
+      ),
+    );
+  }
+
+  async undismissedDriverIds(
+    rideId: string,
+    driverIds: readonly string[],
+  ): Promise<string[]> {
+    return driverIds.filter(
+      (driverId) => !this.requestDismissals.has(`${rideId}:${driverId}`),
+    );
   }
 
   listPage(
     page: number,
     limit: number,
     now: Date,
-    filter?: { status?: string; q?: string; zone?: string; serviceType?: string },
+    filter?: {
+      status?: string;
+      q?: string;
+      zone?: string;
+      serviceType?: string;
+    },
   ): Promise<OpsRidePage> {
     return this.run(() => this.ledger.listPage(page, limit, now, filter));
   }
@@ -188,23 +271,40 @@ export class MemoryRideRepository implements RideRepository {
     limit: number,
     now: Date,
   ): Promise<OpsRidePage> {
-    return this.run(() => this.ledger.listForCustomer(customerId, page, limit, now));
+    return this.run(() =>
+      this.ledger.listForCustomer(customerId, page, limit, now),
+    );
   }
 
-  listFinishedForDriver(driverId: string, window: DriverHistoryWindow): Promise<RideSnapshot[]> {
+  listFinishedForDriver(
+    driverId: string,
+    window: DriverHistoryWindow,
+  ): Promise<RideSnapshot[]> {
     return this.run(() => this.ledger.listFinishedForDriver(driverId, window));
   }
 
-  countFinishedForDrivers(driverIds: readonly string[]): Promise<Map<string, DriverJobCounts>> {
+  countFinishedForDrivers(
+    driverIds: readonly string[],
+  ): Promise<Map<string, DriverJobCounts>> {
     return this.run(() => this.ledger.countFinishedForDrivers(driverIds));
   }
 
-  listIdsForDriverInStatuses(driverId: string, statuses: readonly string[]): Promise<string[]> {
-    return this.run(() => this.ledger.listIdsForDriverInStatuses(driverId, statuses));
+  listIdsForDriverInStatuses(
+    driverId: string,
+    statuses: readonly string[],
+  ): Promise<string[]> {
+    return this.run(() =>
+      this.ledger.listIdsForDriverInStatuses(driverId, statuses),
+    );
   }
 
-  listIdsForCustomerInStatuses(customerId: string, statuses: readonly string[]): Promise<string[]> {
-    return this.run(() => this.ledger.listIdsForCustomerInStatuses(customerId, statuses));
+  listIdsForCustomerInStatuses(
+    customerId: string,
+    statuses: readonly string[],
+  ): Promise<string[]> {
+    return this.run(() =>
+      this.ledger.listIdsForCustomerInStatuses(customerId, statuses),
+    );
   }
 
   customerCancelTimes(customerId: string, since: Date): Promise<Date[]> {
@@ -219,11 +319,18 @@ export class MemoryRideRepository implements RideRepository {
     return this.run(async () => {
       const code = input.voucherCode?.trim();
       const agreed = this.ledger.offerAmount(input.rideId, input.offerId);
-      if (!code || agreed === null || this.ledger.hasSelection(input.customerId, input.idempotencyKey)) {
+      if (
+        !code ||
+        agreed === null ||
+        this.ledger.hasSelection(input.customerId, input.idempotencyKey)
+      ) {
         return finish(this.ledger.select(input));
       }
       if (!this.vouchers) {
-        throw new VoucherRejectedError('VOUCHER_NOT_FOUND', `Mã voucher '${code}' không tồn tại.`);
+        throw new VoucherRejectedError(
+          'VOUCHER_NOT_FOUND',
+          `Mã voucher '${code}' không tồn tại.`,
+        );
       }
       // Runs are serialized, so redeeming first and releasing on a failed selection is atomic.
       const redeemed = await this.vouchers.redeem({
@@ -236,7 +343,10 @@ export class MemoryRideRepository implements RideRepository {
       });
       const outcome = this.ledger.select(input);
       if (outcome.error || !outcome.ride) {
-        await this.vouchers.release({ entityType: 'RIDE', entityId: input.rideId });
+        await this.vouchers.release({
+          entityType: 'RIDE',
+          entityId: input.rideId,
+        });
         return finish(outcome);
       }
       return (
@@ -301,7 +411,9 @@ export class MemoryRideRepository implements RideRepository {
     return this.run(() => {
       const ride = finish(this.ledger.complete(input));
       // Earlier unpaid customer fees are collected in this ride's cash.
-      const charges = this.ledger.pendingFees(ride.customerId).filter((fee) => fee.rideId !== ride.id);
+      const charges = this.ledger
+        .pendingFees(ride.customerId)
+        .filter((fee) => fee.rideId !== ride.id);
       if (charges.length === 0) {
         return ride;
       }
@@ -373,7 +485,8 @@ export class MemoryRideRepository implements RideRepository {
   }): Promise<string[]> {
     return this.run(async () => {
       const ids = this.ledger.listTimeoutCandidates(input.now, input.policy);
-      const picked = input.limit && input.limit > 0 ? ids.slice(0, input.limit) : ids;
+      const picked =
+        input.limit && input.limit > 0 ? ids.slice(0, input.limit) : ids;
       const done: string[] = [];
       for (const id of picked) {
         const outcome = this.ledger.systemTimeout({
@@ -393,7 +506,9 @@ export class MemoryRideRepository implements RideRepository {
 
   pendingFeeTotal(customerId: string): Promise<number> {
     return this.run(() =>
-      this.ledger.pendingFees(customerId).reduce((sum, fee) => sum + fee.amountVnd, 0),
+      this.ledger
+        .pendingFees(customerId)
+        .reduce((sum, fee) => sum + fee.amountVnd, 0),
     );
   }
 
@@ -417,7 +532,10 @@ export class MemoryRideRepository implements RideRepository {
   }
 }
 
-function finish(outcome: { error?: RideRuleError['code']; ride?: RideSnapshot }): RideSnapshot {
+function finish(outcome: {
+  error?: RideRuleError['code'];
+  ride?: RideSnapshot;
+}): RideSnapshot {
   if (outcome.error || !outcome.ride) {
     throw new RideRuleError(outcome.error ?? 'RIDE_NOT_FOUND');
   }

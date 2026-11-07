@@ -363,11 +363,7 @@ class _ProfileFormState extends State<ProfileForm> {
     final textTheme = Theme.of(context).textTheme;
     return Row(
       children: [
-        Icon(
-          DealGoIcons.info,
-          size: 16,
-          color: DealGoColors.textSecondary,
-        ),
+        Icon(DealGoIcons.info, size: 16, color: DealGoColors.textSecondary),
         const SizedBox(width: DealGoSpacing.s6),
         Expanded(
           child: Text(
@@ -589,9 +585,7 @@ class ProfileFormScaffold extends StatelessWidget {
         child: Row(
           children: [
             if (canLeave && Navigator.of(context).canPop())
-              AuthBackButton(
-                onPressed: () => Navigator.of(context).maybePop(),
-              )
+              AuthBackButton(onPressed: () => Navigator.of(context).maybePop())
             else
               const SizedBox(width: DealGoSpacing.s8),
             Expanded(
@@ -618,84 +612,84 @@ class ProfileFormScaffold extends StatelessWidget {
           SafeArea(
             child: isTablet
                 ? Center(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(
-                    vertical: DealGoSpacing.s24,
-                    horizontal: DealGoSpacing.s16,
-                  ),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 520),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: DealGoColors.card,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: DealGoColors.border.withValues(alpha: 0.8),
-                        ),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x140F172A),
-                            blurRadius: 28,
-                            offset: Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          headerRow,
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(
-                              DealGoSpacing.s24,
-                              DealGoSpacing.s8,
-                              DealGoSpacing.s24,
-                              DealGoSpacing.s16,
-                            ),
-                            child: form,
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(
-                              DealGoSpacing.s24,
-                              DealGoSpacing.s8,
-                              DealGoSpacing.s24,
-                              DealGoSpacing.s24,
-                            ),
-                            child: action,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              )
-            : Column(
-                children: [
-                  headerRow,
-                  Expanded(
                     child: SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(
-                        DealGoDimensions.pageGutter,
-                        DealGoSpacing.s8,
-                        DealGoDimensions.pageGutter,
-                        DealGoSpacing.s16,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: DealGoSpacing.s24,
+                        horizontal: DealGoSpacing.s16,
                       ),
-                      child: form,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 520),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: DealGoColors.card,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: DealGoColors.border.withValues(alpha: 0.8),
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x140F172A),
+                                blurRadius: 28,
+                                offset: Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              headerRow,
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  DealGoSpacing.s24,
+                                  DealGoSpacing.s8,
+                                  DealGoSpacing.s24,
+                                  DealGoSpacing.s16,
+                                ),
+                                child: form,
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  DealGoSpacing.s24,
+                                  DealGoSpacing.s8,
+                                  DealGoSpacing.s24,
+                                  DealGoSpacing.s24,
+                                ),
+                                child: action,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
+                  )
+                : Column(
+                    children: [
+                      headerRow,
+                      Expanded(
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(
+                            DealGoDimensions.pageGutter,
+                            DealGoSpacing.s8,
+                            DealGoDimensions.pageGutter,
+                            DealGoSpacing.s16,
+                          ),
+                          child: form,
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          DealGoDimensions.pageGutter,
+                          DealGoSpacing.s8,
+                          DealGoDimensions.pageGutter,
+                          DealGoSpacing.s16,
+                        ),
+                        child: action,
+                      ),
+                    ],
                   ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      DealGoDimensions.pageGutter,
-                      DealGoSpacing.s8,
-                      DealGoDimensions.pageGutter,
-                      DealGoSpacing.s16,
-                    ),
-                    child: action,
-                  ),
-                ],
-              ),
           ),
         ],
       ),

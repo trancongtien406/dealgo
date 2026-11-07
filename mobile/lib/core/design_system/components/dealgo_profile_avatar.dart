@@ -28,7 +28,11 @@ class DealGoProfileAvatar extends StatelessWidget {
     final placeholder = SizedBox(
       width: iconSize,
       height: iconSize,
-      child: Icon(DealGoIcons.user, color: DealGoColors.primary, size: iconSize),
+      child: Icon(
+        DealGoIcons.user,
+        color: DealGoColors.primary,
+        size: iconSize,
+      ),
     );
     return Semantics(
       image: url != null && url.isNotEmpty,

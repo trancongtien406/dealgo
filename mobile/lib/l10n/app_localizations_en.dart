@@ -6473,6 +6473,108 @@ class AppLocalizationsEn extends AppLocalizations {
       'Verify your account before adding a passkey.';
 
   @override
+  String securityPasskeysCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count passkeys',
+      one: '1 passkey',
+      zero: 'Not set up',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get passkeysHeader => 'Passkeys';
+
+  @override
+  String get passkeysTitle => 'Passkeys on your account';
+
+  @override
+  String get passkeysIntro =>
+      'A passkey lets you sign in with your fingerprint, face or screen lock instead of a code. Add one on each device you use.';
+
+  @override
+  String get passkeysAdd => 'Add a passkey on this device';
+
+  @override
+  String get passkeysEmpty =>
+      'No passkey yet. Add one to sign in faster and more safely.';
+
+  @override
+  String get passkeysItemTitle => 'Passkey';
+
+  @override
+  String passkeysAddedOn(String date) {
+    return 'Added $date';
+  }
+
+  @override
+  String get passkeysSynced => 'Synced across your devices';
+
+  @override
+  String get passkeysThisDeviceOnly => 'Stored on one device';
+
+  @override
+  String get passkeysRemove => 'Remove';
+
+  @override
+  String get passkeysRemoveTitle => 'Remove this passkey?';
+
+  @override
+  String get passkeysRemoveBody =>
+      'You will no longer be able to sign in with it. Other sign-in methods stay as they are.';
+
+  @override
+  String get passkeysRemoved => 'Passkey removed.';
+
+  @override
+  String get passkeysLastCredential =>
+      'This is your only sign-in method. Add a verified phone, email or another passkey first.';
+
+  @override
+  String get passkeysLoadFailed => 'Could not load passkeys.';
+
+  @override
+  String get sessionsActiveNow => 'Active now';
+
+  @override
+  String sessionsLastActive(String when) {
+    return 'Last active $when';
+  }
+
+  @override
+  String sessionsSignedInAt(String when) {
+    return 'Signed in $when';
+  }
+
+  @override
+  String sessionsIp(String ip) {
+    return 'IP $ip';
+  }
+
+  @override
+  String get sessionsAdminWeb => 'Admin Web';
+
+  @override
+  String get sessionsUnknownDevice => 'Unknown device';
+
+  @override
+  String get sessionsLogoutTitle => 'Sign out this device?';
+
+  @override
+  String get sessionsLogoutBody =>
+      'It will need to sign in again. If you do not recognise it, also change your sign-in methods.';
+
+  @override
+  String get sessionsLogoutOthersTitle => 'Sign out all other devices?';
+
+  @override
+  String sessionsCount(int count) {
+    return '$count devices signed in';
+  }
+
+  @override
   String get merchantProfileTitle => 'Store profile';
 
   @override
@@ -7111,6 +7213,99 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get merchantReviewsEmpty => 'No reviews yet';
+
+  @override
+  String get merchantReviewsFilterNone => 'No matching reviews';
+
+  @override
+  String get merchantReviewsSearch => 'Search in comments or replies...';
+
+  @override
+  String get merchantReviewsFilterTitle => 'Filters & Sort';
+
+  @override
+  String get merchantReviewsFilterStars => 'Rating';
+
+  @override
+  String get merchantReviewsFilterReplied => 'Merchant reply';
+
+  @override
+  String get merchantReviewsFilterRepliedAll => 'All';
+
+  @override
+  String get merchantReviewsFilterRepliedYes => 'Replied';
+
+  @override
+  String get merchantReviewsFilterRepliedNo => 'Not replied';
+
+  @override
+  String get merchantReviewsFilterComment => 'Comment';
+
+  @override
+  String get merchantReviewsFilterCommentAll => 'All';
+
+  @override
+  String get merchantReviewsFilterCommentOnly => 'With comment';
+
+  @override
+  String get merchantReviewsFilterVisibility => 'Visibility';
+
+  @override
+  String get merchantReviewsFilterVisAll => 'All';
+
+  @override
+  String get merchantReviewsFilterVisVisible => 'Visible';
+
+  @override
+  String get merchantReviewsFilterVisHidden => 'Hidden';
+
+  @override
+  String get merchantReviewsFilterTags => 'Tags';
+
+  @override
+  String get merchantReviewsFilterTagAll => 'All tags';
+
+  @override
+  String get merchantReviewsFilterDate => 'Date range';
+
+  @override
+  String get merchantReviewsFilterDateAll => 'All time';
+
+  @override
+  String get merchantReviewsFilterDateToday => 'Today';
+
+  @override
+  String get merchantReviewsFilterDate7Days => 'Past 7 days';
+
+  @override
+  String get merchantReviewsFilterDate30Days => 'Past 30 days';
+
+  @override
+  String get merchantReviewsFilterDateCustom => 'Custom range';
+
+  @override
+  String get merchantReviewsFilterSort => 'Sort by';
+
+  @override
+  String get merchantReviewsFilterSortNewest => 'Newest';
+
+  @override
+  String get merchantReviewsFilterSortOldest => 'Oldest';
+
+  @override
+  String get merchantReviewsFilterSortLowest => 'Lowest rating';
+
+  @override
+  String get merchantReviewsFilterSortHighest => 'Highest rating';
+
+  @override
+  String get merchantReviewsFilterReset => 'Reset';
+
+  @override
+  String get merchantReviewsFilterApply => 'Apply';
+
+  @override
+  String get merchantReviewsFilterActive => 'Filtered';
 
   @override
   String get merchantReviewHidden => 'Hidden';
@@ -8057,6 +8252,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get contactPhoneDialFailed => 'Couldn\'t open the phone app.';
 
   @override
+  String get contactPhoneSimLabel => 'Direct cellular call (SIM)';
+
+  @override
+  String get contactPhoneCallNow => 'Call now';
+
+  @override
   String get kycReviewAvatar => 'Profile photo';
 
   @override
@@ -8150,9 +8351,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get foodFareIncrease => 'Raise the fee';
-
-  @override
-  String get foodFareReset => 'Use the suggestion';
 
   @override
   String get foodFareNegotiationTitle => 'Delivery fee';
@@ -8424,5 +8622,168 @@ class AppLocalizationsEn extends AppLocalizations {
       one: '1 item',
     );
     return '$_temp0 · $total';
+  }
+
+  @override
+  String merchantItemPhotoCount(int count, int max) {
+    return '$count/$max photos';
+  }
+
+  @override
+  String merchantItemPhotoLimitError(int max) {
+    return 'Up to $max photos per item.';
+  }
+
+  @override
+  String get merchantItemPhotoHint =>
+      'First photo is the cover. Added or removed photos are saved with the form.';
+
+  @override
+  String get merchantItemPhotoCover => 'Cover';
+
+  @override
+  String get merchantItemPhotoNew => 'New';
+
+  @override
+  String get merchantItemPhotoEmpty => 'No photo';
+
+  @override
+  String get merchantItemPhotoCamera => 'Take photo';
+
+  @override
+  String get merchantItemCategoryNone => 'Uncategorized';
+
+  @override
+  String get merchantItemCategoryCreateTitle => 'New category';
+
+  @override
+  String get merchantItemPricingSection => 'Pricing & Promotion';
+
+  @override
+  String get merchantItemPrepSection => 'Preparation & Visibility';
+
+  @override
+  String merchantItemPrepMinutesChip(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String get merchantItemPrepClear => 'Clear';
+
+  @override
+  String merchantItemOptionsGroupCount(int count) {
+    return '$count groups';
+  }
+
+  @override
+  String merchantItemOptionsChoicesCount(int count) {
+    return 'Choices ($count)';
+  }
+
+  @override
+  String get merchantItemOptionsDefaultChoice => 'Default';
+
+  @override
+  String get merchantItemDeleteAction => 'Delete item';
+
+  @override
+  String get merchantItemDeleteConfirmTitle => 'Delete item?';
+
+  @override
+  String merchantItemDeleteConfirmBody(String name) {
+    return '\"$name\" will be removed from the menu.';
+  }
+
+  @override
+  String get merchantItemDeleted => 'Item deleted';
+
+  @override
+  String get merchantProductsAllCategories => 'All categories';
+
+  @override
+  String merchantProductsCount(int shown, int total) {
+    return '$shown/$total items';
+  }
+
+  @override
+  String get merchantStatsRange14 => '14 days';
+
+  @override
+  String get merchantStatsMetricOrders => 'Orders';
+
+  @override
+  String get merchantStatsMetricRevenue => 'Revenue';
+
+  @override
+  String get merchantStatsAvgOrderValue => 'Avg. order value';
+
+  @override
+  String get merchantStatsCompletionRate => 'Completion rate';
+
+  @override
+  String get merchantStatsCancelledOrders => 'Cancelled';
+
+  @override
+  String get merchantStatsDailyAvgSales => 'Avg. daily sales';
+
+  @override
+  String get merchantStatsPeakDay => 'Peak day';
+
+  @override
+  String merchantStatsSelectedDay(String date) {
+    return 'Date $date';
+  }
+
+  @override
+  String get merchantStatsTapBarHint => 'Tap a bar to inspect daily details';
+
+  @override
+  String merchantStatsItemShare(int percent) {
+    return '$percent% of portions sold';
+  }
+
+  @override
+  String get merchantStatsQuickHistory => 'Order history';
+
+  @override
+  String get merchantStatsQuickOffers => 'Store offers';
+
+  @override
+  String get merchantStatsQuickReviews => 'Reply to reviews';
+
+  @override
+  String merchantStatsStatementHistoryBtn(int count) {
+    return 'View $count settlements';
+  }
+
+  @override
+  String get merchantStatsStatementHistoryTitle => 'Settlement history';
+
+  @override
+  String get merchantStatsMenuStatus => 'Menu status';
+
+  @override
+  String merchantStatsMenuItemsCount(int available, int total) {
+    return '$available/$total items on sale';
+  }
+
+  @override
+  String merchantStatsDayDetailTitle(String date) {
+    return 'Details for $date';
+  }
+
+  @override
+  String merchantStatsNetShare(int percent) {
+    return 'Net kept ($percent%)';
+  }
+
+  @override
+  String merchantStatsCommissionShare(int percent) {
+    return 'Commission ($percent%)';
+  }
+
+  @override
+  String merchantStatsDayRow(int delivered, int cancelled) {
+    return '$delivered delivered · $cancelled cancelled';
   }
 }

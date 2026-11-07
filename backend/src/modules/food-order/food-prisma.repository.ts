@@ -1131,6 +1131,12 @@ export class PrismaFoodRepository implements FoodRepository {
       throw new FoodRuleError('FOOD_STORE_NOT_FOUND');
     }
     const available = input.available ?? true;
+    const urls =
+      input.imageUrls !== undefined
+        ? input.imageUrls
+        : input.imageUrl
+          ? [input.imageUrl]
+          : [];
     const item = await this.db.foodItem.create({
       data: {
         storeId: store.id,
@@ -1144,12 +1150,29 @@ export class PrismaFoodRepository implements FoodRepository {
         moderationStatus: input.moderationStatus ?? 'PENDING',
         description: input.description ?? null,
         prepMinutes: input.prepMinutes ?? null,
-        imageUrl: input.imageUrl ?? null,
+        imageUrl: urls[0] ?? input.imageUrl ?? null,
+        imageUrls: urls,
         menuCategoryId: input.menuCategoryId ?? null,
       },
       include: itemOptionsInclude,
     });
     return prismaItemView(item);
+  }
+
+  async deleteItem(
+    ownerId: string,
+    itemId: string,
+  ): Promise<{ deleted: true; id: string; imageUrls: string[] }> {
+    const item = await this.requireOwnedItem(ownerId, itemId);
+    const urls = await this.findItemImageUrls(item.id);
+    await this.db.foodItem.delete({
+      where: { id: item.id },
+    });
+    return {
+      deleted: true,
+      id: item.id,
+      imageUrls: urls,
+    };
   }
 
   async updateItem(input: UpdateCatalogItemInput): Promise<StoreItemView> {
@@ -1544,7 +1567,7 @@ export class PrismaFoodRepository implements FoodRepository {
         skip: (filter.page - 1) * filter.limit,
         take: filter.limit,
         include: {
-          customer: { select: { displayName: true } },
+          customer: { select: { displayName: true, avatarUrl: true } },
           lines: {
             select: { name: true, quantity: true },
             orderBy: { name: 'asc' },
@@ -1578,6 +1601,7 @@ export class PrismaFoodRepository implements FoodRepository {
         createdAt: row.createdAt,
         finishedAt: row.updatedAt,
         customerName: row.customer.displayName || null,
+        customerAvatarUrl: row.customer.avatarUrl ?? null,
         lineSummary: row.lines
           .map((l) => (l.quantity > 1 ? `${l.quantity} x ${l.name}` : l.name))
           .join(' · '),

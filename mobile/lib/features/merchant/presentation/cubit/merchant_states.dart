@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
+import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/network/request_failure.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_models.dart';
 import '../widgets/merchant_widgets.dart';
-import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/format/short_ref.dart';
 import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 import '../../../../core/design_system/components/dealgo_refresh.dart';
@@ -55,10 +55,8 @@ class MerchantIneligibleView extends StatelessWidget {
         child: ListView(
           padding: dealGoScrollPadding(context, merchantPagePadding),
           children: [
-            MerchantHero(
-              icon: DealGoIcons.alert,
-              iconColor: DealGoColors.danger,
-              background: DealGoColors.dangerSurface,
+            DealGoStateView(
+              art: DealGoStateArt.security,
               title: l10n.merchantIneligibleTitle,
               message: l10n.merchantIneligibleMessage,
             ),
@@ -90,10 +88,8 @@ class MerchantQueueEmptyView extends StatelessWidget {
         child: ListView(
           padding: dealGoScrollPadding(context, merchantPagePadding),
           children: [
-            MerchantHero(
-              icon: DealGoIcons.square,
-              iconColor: DealGoColors.brandGreen,
-              background: DealGoColors.greenSurface,
+            DealGoStateView(
+              art: DealGoStateArt.noOrders,
               title: l10n.merchantNoNewOrders,
               message: l10n.merchantNoNewOrdersBody,
             ),
@@ -140,6 +136,11 @@ class _MerchantQueueErrorViewState extends State<MerchantQueueErrorView> {
       RequestFailureKind.permission => l10n.apiErrRoleNotActive,
       RequestFailureKind.error => l10n.stateErrorBody,
     };
+    final art = switch (kind) {
+      RequestFailureKind.offline => DealGoStateArt.offline,
+      RequestFailureKind.permission => DealGoStateArt.security,
+      RequestFailureKind.error => DealGoStateArt.serverError,
+    };
     return MerchantPageFrame(
       title: l10n.merchantQueueTitle,
       onBack: () => merchantBack(context),
@@ -155,10 +156,8 @@ class _MerchantQueueErrorViewState extends State<MerchantQueueErrorView> {
         child: ListView(
           padding: dealGoScrollPadding(context, merchantPagePadding),
           children: [
-            MerchantHero(
-              icon: DealGoIcons.alert,
-              iconColor: DealGoColors.danger,
-              background: DealGoColors.dangerSurface,
+            DealGoStateView(
+              art: art,
               title: title,
               message: message,
             ),

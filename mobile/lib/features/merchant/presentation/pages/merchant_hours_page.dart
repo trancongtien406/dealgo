@@ -4,10 +4,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design_system/components/dealgo_banner.dart';
 import '../../../../core/design_system/components/dealgo_chip.dart';
 import '../../../../core/design_system/components/dealgo_date_time_picker.dart';
+import '../../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
+import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/motion/dealgo_sheet.dart';
 import '../../../../core/l10n/api_error_text.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_models.dart';
@@ -193,22 +197,15 @@ class _MerchantHoursPageState extends State<MerchantHoursPage> {
   }
 
   Future<void> _addClosure() async {
-    final now = DateTime.now();
-    final picked = await showDealGoDatePicker(
-      context: context,
-      firstDate: DateTime(now.year, now.month, now.day),
-      lastDate: DateTime(now.year + 2, 12, 31),
+    final closure = await showAddClosureSheet(
+      context,
+      existingClosures: _closures,
     );
-    if (picked == null || !mounted) {
-      return;
-    }
-    final date =
-        '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
-    if (_closures.any((closure) => closure.date == date)) {
+    if (closure == null || !mounted) {
       return;
     }
     setState(() {
-      _closures = [..._closures, StoreClosureDay(date: date)]
+      _closures = [..._closures, closure]
         ..sort((a, b) => a.date.compareTo(b.date));
       _saved = false;
     });
@@ -259,25 +256,14 @@ class _MerchantHoursPageState extends State<MerchantHoursPage> {
     return ListView(
       padding: dealGoScrollPadding(context, merchantPagePadding),
       children: [
-        Text(
-          l10n.merchantHoursEyebrow,
-          style: textTheme.labelSmall?.copyWith(
-            color: DealGoColors.primary,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.2,
-          ),
-        ),
-        const SizedBox(height: DealGoSpacing.s4),
-        Text(l10n.merchantHoursHeading, style: textTheme.headlineSmall),
         if (!store.schedule.hoursConfigured) ...[
-          const SizedBox(height: DealGoSpacing.s12),
           DealGoBanner(
             key: const Key('merchant-hours-unset'),
             tone: DealGoBannerTone.info,
             message: l10n.merchantHoursUnset,
           ),
+          const SizedBox(height: DealGoSpacing.s12),
         ],
-        const SizedBox(height: DealGoSpacing.s16),
         Text(l10n.merchantHoursWeekly, style: textTheme.titleSmall),
         const SizedBox(height: DealGoSpacing.s8),
         MerchantPanel(
@@ -326,22 +312,61 @@ class _MerchantHoursPageState extends State<MerchantHoursPage> {
                 style: textTheme.titleSmall,
               ),
             ),
-            TextButton(
+            TextButton.icon(
               key: const Key('merchant-hours-add-closure'),
               onPressed: _closures.length >= 60 ? null : _addClosure,
-              child: Text(l10n.merchantHoursAddClosure),
+              icon: const Icon(DealGoIcons.add, size: 16),
+              label: Text(l10n.merchantHoursAddClosure),
             ),
           ],
         ),
+        const SizedBox(height: DealGoSpacing.s8),
         if (_closures.isEmpty)
-          Text(l10n.merchantHoursNoClosures, style: textTheme.bodySmall)
+          MerchantPanel(
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(DealGoSpacing.s8),
+                  decoration: BoxDecoration(
+                    color: DealGoColors.subtlePurple,
+                    borderRadius: BorderRadius.circular(DealGoRadius.small),
+                  ),
+                  child: const Icon(
+                    DealGoIcons.calendar,
+                    color: DealGoColors.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: DealGoSpacing.s12),
+                Expanded(
+                  child: Text(
+                    l10n.merchantHoursNoClosures,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: DealGoColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
         else
           for (final closure in _closures) ...[
             MerchantPanel(
               key: Key('merchant-hours-closure-${closure.date}'),
               child: Row(
                 children: [
-                  const Icon(DealGoIcons.calendar, color: DealGoColors.primary),
+                  Container(
+                    padding: const EdgeInsets.all(DealGoSpacing.s8),
+                    decoration: BoxDecoration(
+                      color: DealGoColors.subtlePurple,
+                      borderRadius: BorderRadius.circular(DealGoRadius.small),
+                    ),
+                    child: const Icon(
+                      DealGoIcons.calendar,
+                      size: 20,
+                      color: DealGoColors.primary,
+                    ),
+                  ),
                   const SizedBox(width: DealGoSpacing.s12),
                   Expanded(
                     child: Column(
@@ -349,14 +374,36 @@ class _MerchantHoursPageState extends State<MerchantHoursPage> {
                       children: [
                         Text(
                           _formatDate(closure.date),
-                          style: textTheme.titleSmall,
+                          style: textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                         if (closure.note case final note?)
-                          Text(note, style: textTheme.bodySmall),
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              top: DealGoSpacing.s2,
+                            ),
+                            child: Text(
+                              note,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: DealGoColors.textSecondary,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
-                  TextButton(
+                  TextButton.icon(
+                    key: Key('merchant-hours-remove-${closure.date}'),
+                    icon: const Icon(
+                      DealGoIcons.trash,
+                      size: 16,
+                      color: DealGoColors.danger,
+                    ),
+                    label: Text(
+                      l10n.merchantHoursRemoveClosure,
+                      style: const TextStyle(color: DealGoColors.danger),
+                    ),
                     onPressed: () => setState(() {
                       _closures = [
                         for (final entry in _closures)
@@ -364,7 +411,6 @@ class _MerchantHoursPageState extends State<MerchantHoursPage> {
                       ];
                       _saved = false;
                     }),
-                    child: Text(l10n.merchantHoursRemoveClosure),
                   ),
                 ],
               ),
@@ -377,6 +423,7 @@ class _MerchantHoursPageState extends State<MerchantHoursPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(l10n.merchantHoursCutoffTitle, style: textTheme.titleSmall),
+              const SizedBox(height: DealGoSpacing.s8),
               Wrap(
                 spacing: DealGoSpacing.s8,
                 runSpacing: DealGoSpacing.s8,
@@ -475,11 +522,11 @@ class _DayToggle extends StatelessWidget {
       child: Material(
         color: open ? DealGoColors.card : DealGoColors.canvas,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(DealGoRadius.small),
           side: BorderSide(color: DealGoColors.border),
         ),
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(DealGoRadius.small),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: DealGoSpacing.s8),
@@ -575,9 +622,9 @@ class _TimeChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: DealGoColors.subtlePurple,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(DealGoRadius.small),
       child: InkWell(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(DealGoRadius.small),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(
@@ -588,6 +635,253 @@ class _TimeChip extends StatelessWidget {
             label,
             style: Theme.of(context).textTheme.labelLarge
                 ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<StoreClosureDay?> showAddClosureSheet(
+  BuildContext context, {
+  required List<StoreClosureDay> existingClosures,
+}) {
+  return showDealGoSheet<StoreClosureDay>(
+    context: context,
+    isScrollControlled: true,
+    builder: (sheetContext) =>
+        _AddClosureSheet(existingClosures: existingClosures),
+  );
+}
+
+class _AddClosureSheet extends StatefulWidget {
+  const _AddClosureSheet({required this.existingClosures});
+
+  final List<StoreClosureDay> existingClosures;
+
+  @override
+  State<_AddClosureSheet> createState() => _AddClosureSheetState();
+}
+
+class _AddClosureSheetState extends State<_AddClosureSheet> {
+  late DateTime _selectedDate;
+  final _note = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    final todayIso = _toIso(now);
+    if (!widget.existingClosures.any((c) => c.date == todayIso)) {
+      _selectedDate = DateTime(now.year, now.month, now.day);
+    } else {
+      final tomorrow = now.add(const Duration(days: 1));
+      _selectedDate = DateTime(tomorrow.year, tomorrow.month, tomorrow.day);
+    }
+  }
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  static String _toIso(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  String get _isoDate => _toIso(_selectedDate);
+
+  bool get _isDuplicate =>
+      widget.existingClosures.any((closure) => closure.date == _isoDate);
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDealGoDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(now.year + 2, 12, 31),
+    );
+    if (picked != null && mounted) {
+      setState(() => _selectedDate = picked);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        DealGoDimensions.pageGutter,
+        DealGoSpacing.s16,
+        DealGoDimensions.pageGutter,
+        DealGoSpacing.s16 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.merchantHoursAddClosure.replaceFirst('+ ', ''),
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(DealGoIcons.close, size: 20),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: DealGoSpacing.s4),
+              Text(
+                'Quán sẽ tạm ngừng nhận đơn trong ngày này',
+                style: textTheme.bodySmall?.copyWith(
+                  color: DealGoColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: DealGoSpacing.s16),
+              InkWell(
+                key: const Key('merchant-closure-pick-date'),
+                onTap: _pickDate,
+                borderRadius: BorderRadius.circular(DealGoRadius.input),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: DealGoSpacing.s14,
+                    vertical: DealGoSpacing.s12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: DealGoColors.canvas,
+                    borderRadius: BorderRadius.circular(DealGoRadius.input),
+                    border: Border.all(
+                      color: _isDuplicate
+                          ? DealGoColors.danger
+                          : DealGoColors.border,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(DealGoSpacing.s8),
+                        decoration: BoxDecoration(
+                          color: DealGoColors.subtlePurple,
+                          borderRadius: BorderRadius.circular(
+                            DealGoRadius.small,
+                          ),
+                        ),
+                        child: const Icon(
+                          DealGoIcons.calendar,
+                          size: 20,
+                          color: DealGoColors.primary,
+                        ),
+                      ),
+                      const SizedBox(width: DealGoSpacing.s12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Ngày nghỉ',
+                              style: textTheme.labelSmall?.copyWith(
+                                color: DealGoColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: DealGoSpacing.s2),
+                            Text(
+                              _formatDate(_isoDate),
+                              style: textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        DealGoIcons.chevronRight,
+                        size: 20,
+                        color: DealGoColors.textSecondary,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_isDuplicate) ...[
+                const SizedBox(height: DealGoSpacing.s6),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: DealGoSpacing.s4,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        DealGoIcons.warning,
+                        size: 14,
+                        color: DealGoColors.danger,
+                      ),
+                      const SizedBox(width: DealGoSpacing.s4),
+                      Expanded(
+                        child: Text(
+                          'Ngày này đã có trong danh sách ngày nghỉ.',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: DealGoColors.danger,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: DealGoSpacing.s16),
+              DealGoTextField(
+                fieldKey: const Key('merchant-closure-note'),
+                label: 'Lý do nghỉ (tùy chọn)',
+                hint: 'VD: Nghỉ lễ Tết, sửa chữa quán, việc gia đình...',
+                controller: _note,
+                maxLength: 100,
+                textInputAction: TextInputAction.done,
+              ),
+              const SizedBox(height: DealGoSpacing.s16),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: DealGoSecondaryButton(
+                        label: l10n.actionCancel,
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ),
+                    const SizedBox(width: DealGoSpacing.s12),
+                    Expanded(
+                      child: DealGoPrimaryButton(
+                        key: const Key('merchant-closure-confirm'),
+                        label: l10n.actionSave,
+                        enabled: !_isDuplicate,
+                        onPressed: () {
+                          if (_isDuplicate) return;
+                          final note = _note.text.trim();
+                          Navigator.of(context).pop(
+                            StoreClosureDay(
+                              date: _isoDate,
+                              note: note.isEmpty ? null : note,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),

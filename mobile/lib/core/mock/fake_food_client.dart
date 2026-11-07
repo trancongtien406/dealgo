@@ -638,6 +638,9 @@ class FakeFoodClient implements FoodClient {
     String? description,
     int? prepMinutes,
     String? menuCategoryId,
+    int? originalPriceVnd,
+    List<MerchantItemImageUpload>? newImages,
+    List<FoodOptionGroup>? optionGroups,
   }) async {
     createItemCalls.add((name: name, priceVnd: priceVnd, available: available));
     final error = catalogWriteError;
@@ -645,14 +648,24 @@ class FakeFoodClient implements FoodClient {
       throw error;
     }
     final store = _ownedCatalog();
+    final itemId = 'mock-item-${++_itemSeq}';
+    final uploadedUrls = [
+      if (newImages != null)
+        for (var i = 0; i < newImages.length; i++)
+          '/v1/public/menu-items/$itemId/fake-$i.jpg',
+    ];
     final item = FoodMenuItem(
-      id: 'mock-item-${++_itemSeq}',
+      id: itemId,
       name: name,
       priceVnd: priceVnd,
       available: available ?? true,
       description: description,
       prepMinutes: prepMinutes,
       menuCategoryId: menuCategoryId,
+      originalPriceVnd: originalPriceVnd,
+      imageUrl: uploadedUrls.isNotEmpty ? uploadedUrls.first : null,
+      imageUrls: uploadedUrls,
+      optionGroups: optionGroups ?? const [],
     );
     details = {
       ...details,
@@ -671,11 +684,17 @@ class FakeFoodClient implements FoodClient {
     int? priceVnd,
     bool? available,
     String? description,
+    bool clearDescription = false,
     int? prepMinutes,
+    bool clearPrepMinutes = false,
     String? imageUrl,
+    List<String>? imageUrls,
+    List<MerchantItemImageUpload>? newImages,
     String? menuCategoryId,
+    bool clearMenuCategoryId = false,
     int? originalPriceVnd,
     bool clearOriginalPrice = false,
+    List<FoodOptionGroup>? optionGroups,
   }) async {
     updateItemCalls.add((itemId: itemId, name: name, priceVnd: priceVnd));
     final error = catalogWriteError;
@@ -686,11 +705,17 @@ class FakeFoodClient implements FoodClient {
         priceVnd == null &&
         available == null &&
         description == null &&
+        !clearDescription &&
         prepMinutes == null &&
+        !clearPrepMinutes &&
         imageUrl == null &&
+        imageUrls == null &&
+        (newImages == null || newImages.isEmpty) &&
         menuCategoryId == null &&
+        !clearMenuCategoryId &&
         originalPriceVnd == null &&
-        !clearOriginalPrice) {
+        !clearOriginalPrice &&
+        optionGroups == null) {
       throw const ApiException(
         statusCode: 400,
         message: 'Provide at least one field to update',
@@ -698,18 +723,60 @@ class FakeFoodClient implements FoodClient {
       );
     }
     return _replaceOwnedItem(itemId, (item) {
+      final baseUrls = imageUrls ?? item.imageUrls;
+      final addedUrls = [
+        if (newImages != null)
+          for (var i = 0; i < newImages.length; i++)
+            '/v1/public/menu-items/$itemId/fake-${baseUrls.length + i}.jpg',
+      ];
+      final nextUrls = (imageUrls != null || addedUrls.isNotEmpty)
+          ? [...baseUrls, ...addedUrls]
+          : null;
+      final nextImageUrl = nextUrls != null
+          ? (nextUrls.isNotEmpty ? nextUrls.first : null)
+          : imageUrl;
       return item.copyWith(
         name: name,
         priceVnd: priceVnd,
         available: available,
         description: description,
+        clearDescription: clearDescription,
         prepMinutes: prepMinutes,
-        imageUrl: imageUrl,
+        clearPrepMinutes: clearPrepMinutes,
+        imageUrl: nextImageUrl,
+        clearImageUrl: nextUrls != null && nextUrls.isEmpty,
+        imageUrls: nextUrls,
         menuCategoryId: menuCategoryId,
+        clearMenuCategoryId: clearMenuCategoryId,
         originalPriceVnd: originalPriceVnd,
         clearOriginalPrice: clearOriginalPrice,
+        optionGroups: optionGroups,
       );
     });
+  }
+
+  @override
+  Future<void> deleteMerchantItem({
+    required String accessToken,
+    required String itemId,
+  }) async {
+    final error = catalogWriteError;
+    if (error != null) {
+      throw error;
+    }
+    final store = _ownedCatalog();
+    final nextItems = store.items.where((i) => i.id != itemId).toList();
+    if (nextItems.length == store.items.length) {
+      throw const ApiException(
+        statusCode: 404,
+        message: 'Catalog item not found',
+        errorCode: 'FOOD_ITEM_NOT_FOUND',
+      );
+    }
+    details = {
+      ...details,
+      store.id: store.copyWith(items: List.unmodifiable(nextItems)),
+    };
   }
 
   @override
@@ -941,6 +1008,8 @@ class FakeFoodClient implements FoodClient {
     int limit = 20,
     String? tab,
     String? q,
+    DateTime? from,
+    DateTime? to,
   }) async {
     return const MerchantHistoryPage(
       items: [],

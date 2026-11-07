@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../core/design_system/components/dealgo_dialog.dart';
+import '../../../../core/design_system/components/dealgo_primary_button.dart';
 import '../../../../core/design_system/components/dealgo_refresh.dart';
+import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/components/dealgo_text_field.dart';
@@ -10,6 +11,7 @@ import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../core/format/text_case.dart';
 import '../../../../core/l10n/api_error_text.dart';
+import '../../../../core/motion/dealgo_sheet.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../domain/entities/merchant_menu_models.dart';
@@ -123,37 +125,14 @@ class _MerchantCategoriesPageState extends State<MerchantCategoriesPage> {
 
   Future<void> _upsert({MerchantMenuCategory? existing}) async {
     final l10n = AppLocalizations.of(context);
-    final nameCtrl = TextEditingController(text: existing?.name ?? '');
-    final descCtrl = TextEditingController(text: existing?.description ?? '');
-    final ok = await showDealGoDialog<bool>(
+    final draft = await showDealGoSheet<(String, String?)>(
       context: context,
-      title: existing == null ? l10n.merchantCategoriesAdd : l10n.actionSave,
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          DealGoTextField(
-            label: l10n.merchantCategoryName,
-            fieldKey: const Key('merchant-category-name'),
-            controller: nameCtrl,
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-          DealGoTextField(
-            label: l10n.merchantCategoryDesc,
-            controller: descCtrl,
-          ),
-        ],
-      ),
-      primaryLabel: l10n.actionSave,
-      secondaryLabel: l10n.actionCancel,
-      primaryKey: const Key('merchant-category-save'),
+      isScrollControlled: true,
+      builder: (_) => _CategoryUpsertSheet(existing: existing),
     );
-    final name = nameCtrl.text.trim();
-    final desc = descCtrl.text.trim();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      nameCtrl.dispose();
-      descCtrl.dispose();
-    });
-    if (ok != true || !mounted || name.isEmpty) return;
+    if (draft == null || !mounted) return;
+    final (name, desc) = draft;
+    if (name.isEmpty) return;
     final token = merchantAccessToken(context) ?? '';
     final repo = context.read<MerchantOrdersRepository>();
     try {
@@ -161,14 +140,14 @@ class _MerchantCategoriesPageState extends State<MerchantCategoriesPage> {
         await repo.createMenuCategory(
           accessToken: token,
           name: name,
-          description: desc.isEmpty ? null : desc,
+          description: desc,
         );
       } else {
         await repo.updateMenuCategory(
           accessToken: token,
           categoryId: existing.id,
           name: name,
-          description: desc.isEmpty ? null : desc,
+          description: desc,
         );
       }
       await _load();
@@ -202,20 +181,13 @@ class _MerchantCategoriesPageState extends State<MerchantCategoriesPage> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return MerchantPageFrame(
-      title: l10n.merchantCategoriesTitle,
+      title: l10n.merchantCategoriesHeadline,
       onBack: () => merchantBack(context),
-      footer: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          DealGoDimensions.pageGutter,
-          DealGoSpacing.s8,
-          DealGoDimensions.pageGutter,
-          DealGoSpacing.s12,
-        ),
-        child: FilledButton(
-          key: const Key('merchant-category-add'),
-          onPressed: _loading || _reordering ? null : () => _upsert(),
-          child: Text(l10n.merchantCategoriesAdd),
-        ),
+      footer: MerchantPrimaryBar(
+        label: l10n.merchantCategoriesAdd,
+        buttonKey: const Key('merchant-category-add'),
+        enabled: !_loading && !_reordering,
+        onPressed: () => _upsert(),
       ),
       body: _loading && _items.isEmpty
           ? const DealGoSkeletonList(itemCount: 4)
@@ -243,10 +215,12 @@ class _MerchantCategoriesPageState extends State<MerchantCategoriesPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        l10n.merchantCategoriesHeadline,
-                        style: Theme.of(context).textTheme.titleLarge,
+                        l10n.merchantCategoriesCount('${_items.length}'),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: DealGoColors.textSecondary,
+                        ),
                       ),
-                      Text(l10n.merchantCategoriesCount('${_items.length}')),
+                      const SizedBox(height: DealGoSpacing.s8),
                       DealGoTextField(
                         label: l10n.merchantCategoriesSearchHint,
                         showLabel: false,
@@ -254,6 +228,7 @@ class _MerchantCategoriesPageState extends State<MerchantCategoriesPage> {
                         prefixIcon: DealGoIcons.search,
                         controller: _search,
                         fieldKey: const Key('merchant-category-search'),
+                        textInputAction: TextInputAction.search,
                         onChanged: (_) => setState(() {}),
                       ),
                       if (_failure != null)
@@ -278,7 +253,6 @@ class _MerchantCategoriesPageState extends State<MerchantCategoriesPage> {
                         ? DealGoStateView(
                             art: DealGoStateArt.noSearch,
                             title: l10n.merchantCategoriesEmpty,
-                            compact: true,
                           )
                         : ReorderableListView.builder(
                             key: const Key('merchant-category-reorder'),
@@ -297,7 +271,7 @@ class _MerchantCategoriesPageState extends State<MerchantCategoriesPage> {
                                   child: ListTile(
                                     leading: ReorderableDragStartListener(
                                       index: index,
-                                      child: const Icon(Icons.drag_handle),
+                                      child: const Icon(DealGoIcons.dragHandle),
                                     ),
                                     title: Text(
                                       capitalizeFirstLetter(cat.name),
@@ -314,7 +288,7 @@ class _MerchantCategoriesPageState extends State<MerchantCategoriesPage> {
                                           key: Key(
                                             'merchant-category-edit-${cat.id}',
                                           ),
-                                          icon: const Icon(Icons.edit_outlined),
+                                          icon: const Icon(DealGoIcons.edit),
                                           onPressed: _reordering
                                               ? null
                                               : () => _upsert(existing: cat),
@@ -323,9 +297,7 @@ class _MerchantCategoriesPageState extends State<MerchantCategoriesPage> {
                                           key: Key(
                                             'merchant-category-delete-${cat.id}',
                                           ),
-                                          icon: const Icon(
-                                            Icons.delete_outline,
-                                          ),
+                                          icon: const Icon(DealGoIcons.trash),
                                           onPressed: _reordering
                                               ? null
                                               : () => _delete(cat),
@@ -341,6 +313,100 @@ class _MerchantCategoriesPageState extends State<MerchantCategoriesPage> {
                 ),
               ],
             ),
+    );
+  }
+}
+
+class _CategoryUpsertSheet extends StatefulWidget {
+  const _CategoryUpsertSheet({this.existing});
+
+  final MerchantMenuCategory? existing;
+
+  @override
+  State<_CategoryUpsertSheet> createState() => _CategoryUpsertSheetState();
+}
+
+class _CategoryUpsertSheetState extends State<_CategoryUpsertSheet> {
+  late final _name = TextEditingController(text: widget.existing?.name ?? '');
+  late final _desc = TextEditingController(
+    text: widget.existing?.description ?? '',
+  );
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _desc.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          DealGoDimensions.pageGutter,
+          DealGoSpacing.s20,
+          DealGoDimensions.pageGutter,
+          DealGoSpacing.s16 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              widget.existing == null
+                  ? l10n.merchantCategoriesAdd
+                  : l10n.actionSave,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: DealGoSpacing.s12),
+            DealGoTextField(
+              label: l10n.merchantCategoryName,
+              fieldKey: const Key('merchant-category-name'),
+              controller: _name,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: DealGoSpacing.s12),
+            DealGoTextField(
+              label: l10n.merchantCategoryDesc,
+              controller: _desc,
+              textInputAction: TextInputAction.done,
+            ),
+            const SizedBox(height: DealGoSpacing.s20),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: DealGoSecondaryButton(
+                      label: l10n.actionCancel,
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                  const SizedBox(width: DealGoSpacing.s12),
+                  Expanded(
+                    child: DealGoPrimaryButton(
+                      key: const Key('merchant-category-save'),
+                      label: l10n.actionSave,
+                      onPressed: () {
+                        FocusScope.of(context).unfocus();
+                        final name = _name.text.trim();
+                        final desc = _desc.text.trim();
+                        Navigator.of(context).pop((
+                          name,
+                          desc.isEmpty ? null : desc,
+                        ));
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

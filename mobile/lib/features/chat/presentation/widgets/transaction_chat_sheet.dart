@@ -78,8 +78,7 @@ Future<void> showTransactionChatSheet({
   return showDealGoSheet<void>(
     context: context,
     isScrollControlled: true,
-    // The theme adds a drag handle to every sheet; this one draws its own.
-    useSafeArea: false,
+    useSafeArea: true,
     backgroundColor: DealGoColors.card,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(

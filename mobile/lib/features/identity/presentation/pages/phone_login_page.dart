@@ -144,9 +144,8 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
           label: l10n.authPhoneLabel,
           onTap: isPasskeyLoading
               ? null
-              : () => _ifLegalAccepted(
-                  () => context.push(AuthRoutes.phoneLogin),
-                ),
+              : () =>
+                    _ifLegalAccepted(() => context.push(AuthRoutes.phoneLogin)),
         ),
       if (_methods.isEnabled(AuthMethodPolicy.email))
         _AuthMethodTile(
@@ -155,9 +154,8 @@ class _PhoneLoginPageState extends State<PhoneLoginPage> {
           label: l10n.authEmailLabel,
           onTap: isPasskeyLoading
               ? null
-              : () => _ifLegalAccepted(
-                  () => context.push(AuthRoutes.emailLogin),
-                ),
+              : () =>
+                    _ifLegalAccepted(() => context.push(AuthRoutes.emailLogin)),
         ),
       if (_methods.isEnabled(AuthMethodPolicy.passkey))
         _AuthMethodTile(

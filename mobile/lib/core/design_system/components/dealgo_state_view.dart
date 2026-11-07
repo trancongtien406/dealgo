@@ -63,11 +63,7 @@ class _StateArtSpec {
 /// using a custom-painted orbital backdrop, an elevated center plate, a
 /// duotone semantic icon, and a floating corner badge.
 class DealGoStateArtwork extends StatelessWidget {
-  const DealGoStateArtwork({
-    required this.art,
-    this.size = 152,
-    super.key,
-  });
+  const DealGoStateArtwork({required this.art, this.size = 152, super.key});
 
   final DealGoStateArt art;
   final double size;

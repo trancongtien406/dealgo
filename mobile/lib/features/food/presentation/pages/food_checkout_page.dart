@@ -63,6 +63,13 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
     final snapshot = cart.state;
     final held = retry ? _attempt : null;
     if (held == null && !snapshot.canCheckout) {
+      setState(() {
+        _phase = CheckoutRejected(
+          checkoutBlockingMessage(snapshot, AppLocalizations.of(context)) ??
+              AppLocalizations.of(context).checkoutErrGeneric,
+        );
+      });
+      _announceRejection();
       return;
     }
     final attempt =

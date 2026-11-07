@@ -5,6 +5,9 @@ import 'package:intl/intl.dart';
 import '../utils/merchant_kitchen_lines.dart';
 import '../widgets/merchant_kitchen_line_row.dart';
 import '../widgets/merchant_order_change_sheet.dart';
+import '../../../../core/config/api_base_url.dart';
+import '../../../../core/design_system/components/dealgo_nav_insets.dart';
+import '../../../../core/design_system/components/dealgo_profile_avatar.dart';
 import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
@@ -31,7 +34,6 @@ import '../../../identity/presentation/cubit/auth_cubit.dart';
 import '../../../../core/design_system/components/handover_ref_badge.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/format/short_ref.dart';
-import '../../../../core/design_system/components/dealgo_nav_insets.dart';
 
 class MerchantMissingOrderPage extends StatelessWidget {
   const MerchantMissingOrderPage({super.key});
@@ -124,6 +126,8 @@ class _MerchantOrderView extends StatelessWidget {
       body: _Detail(
         order: view.order,
         kitchenLines: view.kitchenLines,
+        detail: view.detail,
+        loadingLines: view.loadingLines,
         busy: view.busy,
         message: view.message?.resolve(AppLocalizations.of(context)),
         handoffDone: view.handoffDone,
@@ -158,6 +162,8 @@ class _Detail extends StatelessWidget {
   const _Detail({
     required this.order,
     required this.kitchenLines,
+    this.detail,
+    this.loadingLines = false,
     required this.busy,
     required this.message,
     required this.handoffDone,
@@ -174,6 +180,8 @@ class _Detail extends StatelessWidget {
 
   final MerchantQueueOrder order;
   final List<MerchantKitchenLine> kitchenLines;
+  final FoodOrderDetail? detail;
+  final bool loadingLines;
   final bool busy;
   final String? message;
   final bool handoffDone;
@@ -198,12 +206,22 @@ class _Detail extends StatelessWidget {
     final preparing = order.status == 'PREPARING';
     final l10n = AppLocalizations.of(context);
     final isPlaced = order.status == 'PLACED';
+    final isCancelled = order.status == 'CANCELLED';
+    final hasDriver =
+        order.driverName != null ||
+        ready ||
+        order.status == 'PICKED_UP' ||
+        order.status == 'DELIVERED' ||
+        (detail?.assignedDriverId != null);
     final title = switch (order.status) {
       'PLACED' => l10n.merchantOrderTitleNew,
       'PREPARING' => l10n.merchantOrderTitlePreparing,
       'READY' ||
       'READY_FOR_PICKUP' ||
       'ASSIGNED' => l10n.merchantOrderTitleReady,
+      'PICKED_UP' => 'Đang giao hàng',
+      'DELIVERED' => 'Đã giao thành công',
+      'CANCELLED' => 'Đơn hàng đã hủy',
       _ => l10n.merchantOrderTitle,
     };
     final lines = kitchenLines;
@@ -247,6 +265,7 @@ class _Detail extends StatelessWidget {
       body: ListView(
         padding: dealGoScrollPadding(context, merchantPagePadding),
         children: [
+          // 1. Order Status Overview Card
           MerchantPanel(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -266,6 +285,10 @@ class _Detail extends StatelessWidget {
                   children: [
                     // QA M5: the badge is the single order ref on this card.
                     HandoverRefBadge(orderId: order.id, dense: true),
+                    MerchantChip(
+                      label: merchantStatusLabel(l10n, order.status),
+                      tone: merchantStatusTone(order.status),
+                    ),
                     if (placedAt != null)
                       MerchantChip(
                         label: l10n.merchantOrderPlacedAt(
@@ -275,273 +298,454 @@ class _Detail extends StatelessWidget {
                       ),
                   ],
                 ),
+              ],
+            ),
+          ),
+
+          // 2. Cancellation Reason (if cancelled)
+          if (isCancelled || detail?.cancelReason != null) ...[
+            const SizedBox(height: DealGoSpacing.s12),
+            MerchantPanel(
+              color: DealGoColors.dangerSurface,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(DealGoIcons.alert, color: DealGoColors.danger),
+                  const SizedBox(width: DealGoSpacing.s12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Lý do hủy đơn',
+                          style: textTheme.titleSmall?.copyWith(
+                            color: DealGoColors.danger,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: DealGoSpacing.s4),
+                        Text(
+                          detail?.cancelReason != null
+                              ? foodCancelReasonText(l10n, detail!.cancelReason!)
+                              : 'Đơn hàng đã bị hủy.',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: DealGoColors.text,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // 3. Customer & Delivery Destination Card
+          const SizedBox(height: DealGoSpacing.s12),
+          MerchantPanel(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      DealGoIcons.user,
+                      size: 18,
+                      color: DealGoColors.primary,
+                    ),
+                    const SizedBox(width: DealGoSpacing.s8),
+                    Text(
+                      'Khách hàng & Giao nhận',
+                      style: textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: DealGoSpacing.s12),
+                Row(
+                  children: [
+                    DealGoProfileAvatar(
+                      avatarUrl: resolveMediaUrl(
+                        detail?.customerAvatarUrl ?? order.customerAvatarUrl,
+                      ),
+                      size: 44,
+                      semanticLabel:
+                          order.customerName ?? l10n.merchantOrderCustomer,
+                    ),
+                    const SizedBox(width: DealGoSpacing.s12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            order.customerName ?? l10n.merchantOrderCustomer,
+                            style: textTheme.titleMedium,
+                          ),
+                          if (order.dropoff.label.isNotEmpty) ...[
+                            const SizedBox(height: DealGoSpacing.s4),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: Icon(
+                                    DealGoIcons.pin,
+                                    size: 14,
+                                    color: DealGoColors.textTertiary,
+                                  ),
+                                ),
+                                const SizedBox(width: DealGoSpacing.s4),
+                                Expanded(
+                                  child: Text(
+                                    order.dropoff.label,
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: DealGoColors.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (merchantCanChat(order.status))
+                      IconButton.filledTonal(
+                        key: const Key('merchant-open-chat'),
+                        onPressed: () => openMerchantCustomerChat(context, order),
+                        icon: ChatUnreadBadge(
+                          aggregateType: 'FoodOrderShop',
+                          aggregateId: order.id,
+                          child: const Icon(DealGoIcons.chat, size: 18),
+                        ),
+                        tooltip: l10n.chatContactCustomer,
+                      ),
+                  ],
+                ),
                 if (isPlaced) ...[
+                  const SizedBox(height: DealGoSpacing.s8),
+                  MerchantChip(
+                    label: l10n.merchantOrderNewChip,
+                    tone: MerchantChipTone.warning,
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          // 4. Driver Information Card
+          if (hasDriver) ...[
+            const SizedBox(height: DealGoSpacing.s12),
+            MerchantPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        DealGoIcons.motorbike,
+                        size: 18,
+                        color: DealGoColors.primary,
+                      ),
+                      const SizedBox(width: DealGoSpacing.s8),
+                      Text(
+                        l10n.merchantDriverTitle,
+                        style: textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: DealGoSpacing.s12),
                   Row(
                     children: [
-                      CircleAvatar(
-                        backgroundColor: DealGoColors.subtlePurple,
-                        child: Icon(
-                          DealGoIcons.user,
-                          color: DealGoColors.primary,
-                        ),
-                      ),
+                      (detail?.driverAvatarUrl ?? order.driverAvatarUrl)?.isNotEmpty == true
+                          ? DealGoProfileAvatar(
+                              avatarUrl: resolveMediaUrl(
+                                detail?.driverAvatarUrl ?? order.driverAvatarUrl,
+                              ),
+                              size: 44,
+                              semanticLabel:
+                                  order.driverName ?? l10n.merchantDriverTitle,
+                            )
+                          : Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: DealGoColors.greenSurface,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                DealGoIcons.motorbike,
+                                color: DealGoColors.brandGreen,
+                                size: 22,
+                              ),
+                            ),
                       const SizedBox(width: DealGoSpacing.s12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              order.customerName ?? l10n.merchantOrderCustomer,
+                              order.driverName ?? l10n.merchantDriverWaiting,
                               style: textTheme.titleMedium,
                             ),
                             Text(
-                              order.dropoff.label,
-                              style: textTheme.bodySmall,
+                              switch (order.status) {
+                                'ASSIGNED' =>
+                                  'Tài xế đang di chuyển đến quán lấy món',
+                                'PICKED_UP' =>
+                                  'Tài xế đã lấy món, đang giao cho khách',
+                                'DELIVERED' =>
+                                  'Tài xế đã hoàn thành giao hàng',
+                                _ => l10n.merchantDriverWaiting,
+                              },
+                              style: textTheme.bodySmall?.copyWith(
+                                color: DealGoColors.textSecondary,
+                              ),
                             ),
                           ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: DealGoSpacing.s8),
-                  MerchantChip(
-                    label: l10n.merchantOrderNewChip,
-                    tone: MerchantChipTone.warning,
-                  ),
-                ] else ...[
-                  const SizedBox(height: DealGoSpacing.s8),
-                  Wrap(
-                    spacing: DealGoSpacing.s8,
-                    runSpacing: DealGoSpacing.s8,
-                    children: [
-                      MerchantChip(
-                        label: merchantStatusLabel(l10n, order.status),
-                        tone: merchantStatusTone(order.status),
+                  if (ready && handoverCode != null) ...[
+                    const SizedBox(height: DealGoSpacing.s12),
+                    Container(
+                      padding: const EdgeInsets.all(DealGoSpacing.s12),
+                      decoration: BoxDecoration(
+                        color: DealGoColors.subtlePurple,
+                        borderRadius: BorderRadius.circular(DealGoRadius.small),
                       ),
-                      if (order.customerName case final name?)
-                        MerchantChip(
-                          label: l10n.merchantOrderCustomerName(name),
-                          tone: MerchantChipTone.neutral,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            key: const Key('merchant-handover-code-row'),
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  l10n.merchantHandoverCodeLabel,
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                handoverCode!,
+                                key: const Key('merchant-handover-code'),
+                                style: textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 4,
+                                  color: DealGoColors.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: DealGoSpacing.s4),
+                          Text(
+                            l10n.merchantHandoverCodeHint,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: DealGoColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+
+          // 5. Ordered Food Items Section ("Danh sách món")
+          const SizedBox(height: DealGoSpacing.s12),
+          MerchantPanel(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          DealGoIcons.food,
+                          size: 18,
+                          color: DealGoColors.primary,
                         ),
-                      if (order.driverName case final name?)
-                        MerchantChip(
-                          label: l10n.merchantOrderDriverName(name),
-                          tone: MerchantChipTone.green,
+                        const SizedBox(width: DealGoSpacing.s8),
+                        Text(
+                          lines.isNotEmpty
+                              ? '${l10n.merchantOrderItemsTitle} (${lines.length})'
+                              : l10n.merchantOrderItemsTitle,
+                          style: textTheme.titleMedium,
                         ),
-                    ],
+                      ],
+                    ),
+                    if (lines.isNotEmpty)
+                      MerchantChip(
+                        label:
+                            '${lines.fold<int>(0, (sum, l) => sum + l.qty)} phần',
+                        tone: MerchantChipTone.neutral,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: DealGoSpacing.s12),
+                if (loadingLines && lines.isEmpty) ...[
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: DealGoSpacing.s16),
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+                ] else if (lines.isNotEmpty) ...[
+                  for (var i = 0; i < lines.length; i++) ...[
+                    if (i > 0) const Divider(height: DealGoSpacing.s16),
+                    MerchantKitchenLineRow(line: lines[i]),
+                  ],
+                ] else ...[
+                  Text(
+                    'Đơn gồm ${order.lineCount} món',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: DealGoColors.textSecondary,
+                    ),
                   ),
                 ],
-                if (merchantCanChat(order.status)) ...[
+                if ((isPlaced || preparing) &&
+                    lines.any((line) => line.id != null)) ...[
                   const SizedBox(height: DealGoSpacing.s12),
-                  OutlinedButton.icon(
-                    key: const Key('merchant-open-chat'),
-                    onPressed: () => openMerchantCustomerChat(context, order),
-                    icon: ChatUnreadBadge(
-                      aggregateType: 'FoodOrderShop',
-                      aggregateId: order.id,
-                      child: const Icon(DealGoIcons.chat, size: 18),
+                  const Divider(height: 1),
+                  const SizedBox(height: DealGoSpacing.s8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      key: const Key('merchant-edit-order'),
+                      onPressed: busy ? null : onEditOrder,
+                      icon: const Icon(DealGoIcons.edit, size: 16),
+                      label: Text(l10n.merchantEditOrder),
                     ),
-                    label: Text(l10n.chatContactCustomer),
                   ),
                 ],
               ],
             ),
           ),
-          if (isPlaced) ...[
-            const SizedBox(height: DealGoSpacing.s12),
-            MerchantPanel(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.merchantOrderItemsTitle,
-                    style: textTheme.titleMedium,
-                  ),
-                  for (final line in lines) ...[
-                    const SizedBox(height: DealGoSpacing.s8),
-                    MerchantKitchenLineRow(line: line),
-                  ],
-                ],
-              ),
-            ),
-          ],
-          if ((isPlaced || preparing) &&
-              ((orderNote ?? '').trim().isNotEmpty || !utensils)) ...[
+
+          // 6. Customer Note & Utensils Section
+          if ((orderNote ?? '').trim().isNotEmpty || !utensils) ...[
             const SizedBox(height: DealGoSpacing.s12),
             MerchantPanel(
               child: FoodOrderExtrasBlock(note: orderNote, utensils: utensils),
             ),
           ],
+
+          // 7. Guidance Notes
           if (preparing) ...[
-            const SizedBox(height: DealGoSpacing.s12),
-            MerchantPanel(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.merchantItemsToPrepare,
-                    style: textTheme.titleMedium,
-                  ),
-                  for (final line in lines) ...[
-                    const SizedBox(height: DealGoSpacing.s8),
-                    MerchantKitchenLineRow(line: line),
-                  ],
-                ],
-              ),
-            ),
             const SizedBox(height: DealGoSpacing.s12),
             MerchantNote(
               tone: MerchantNoteTone.green,
               message: l10n.merchantReadyHint,
             ),
           ],
-          if (ready) ...[
-            const SizedBox(height: DealGoSpacing.s12),
-            MerchantPanel(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(l10n.merchantDriverTitle, style: textTheme.titleMedium),
-                  const SizedBox(height: DealGoSpacing.s8),
-                  Row(
-                    children: [
-                      const Icon(
-                        DealGoIcons.motorbike,
-                        color: DealGoColors.primary,
-                      ),
-                      const SizedBox(width: DealGoSpacing.s12),
-                      Expanded(
-                        child: Text(
-                          // Masked by the server once a driver has claimed it.
-                          order.driverName ?? l10n.merchantDriverWaiting,
-                          style: textTheme.bodyMedium,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: DealGoSpacing.s12),
-            MerchantPanel(
-              color: DealGoColors.subtlePurple,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(l10n.merchantHandoffTitle, style: textTheme.titleMedium),
-                  const SizedBox(height: DealGoSpacing.s8),
-                  if (handoverCode case final code?) ...[
-                    Row(
-                      key: const Key('merchant-handover-code-row'),
-                      children: [
-                        Expanded(
-                          child: Text(
-                            l10n.merchantHandoverCodeLabel,
-                            style: textTheme.bodyMedium,
-                          ),
-                        ),
-                        Text(
-                          code,
-                          key: const Key('merchant-handover-code'),
-                          style: textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 4,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      l10n.merchantHandoverCodeHint,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: DealGoColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: DealGoSpacing.s8),
-                  ],
-                  MerchantMoneyRow(
-                    label: l10n.merchantOrderRefLabel,
-                    value: shortRef(order.id),
-                    emphasize: true,
-                  ),
-                  MerchantMoneyRow(
-                    label: l10n.merchantLineCountLabel,
-                    value: '${order.lineCount}',
-                  ),
-                  MerchantMoneyRow(
-                    label: l10n.merchantHandoffCodLabel,
-                    value: formatVnd(order.subtotalVnd),
-                    emphasize: true,
-                  ),
-                ],
-              ),
-            ),
+          if (ready && !handoffDone) ...[
             const SizedBox(height: DealGoSpacing.s12),
             MerchantNote(
               tone: MerchantNoteTone.green,
-              message: handoffDone
-                  ? l10n.merchantHandoffDoneNote
-                  : l10n.merchantHandoffNote,
+              message: l10n.merchantHandoffNote,
             ),
           ],
-          if (!preparing) ...[
+          if (ready && handoffDone) ...[
             const SizedBox(height: DealGoSpacing.s12),
-            MerchantPanel(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.merchantOrderValueTitle,
-                    style: textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: DealGoSpacing.s8),
+            MerchantNote(
+              tone: MerchantNoteTone.green,
+              message: l10n.merchantHandoffDoneNote,
+            ),
+          ],
+
+          // 8. Payment & Value Breakdown
+          const SizedBox(height: DealGoSpacing.s12),
+          MerchantPanel(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      DealGoIcons.receipt,
+                      size: 18,
+                      color: DealGoColors.primary,
+                    ),
+                    const SizedBox(width: DealGoSpacing.s8),
+                    Text(
+                      l10n.merchantOrderValueTitle,
+                      style: textTheme.titleMedium,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: DealGoSpacing.s12),
+                MerchantMoneyRow(
+                  label: l10n.merchantFoodValueLabel,
+                  value: formatVnd(order.subtotalVnd),
+                ),
+                MerchantMoneyRow(
+                  label: merchantDeliveryFeeLabel(l10n, order.status),
+                  value: formatVnd(order.deliveryFareVnd),
+                ),
+                if ((detail?.discountVnd ?? 0) > 0)
                   MerchantMoneyRow(
-                    label: l10n.merchantFoodValueLabel,
-                    value: formatVnd(order.subtotalVnd),
-                  ),
-                  MerchantMoneyRow(
-                    label: merchantDeliveryFeeLabel(l10n, order.status),
-                    value: formatVnd(order.deliveryFareVnd),
-                  ),
+                    label: l10n.merchantOrderDiscount,
+                    value: '-${formatVnd(detail!.discountVnd)}',
+                  )
+                else
                   MerchantMoneyRow(
                     label: l10n.merchantOrderDiscount,
                     value: formatVnd(0),
                   ),
-                  const Divider(height: DealGoSpacing.s24),
-                  MerchantMoneyRow(
-                    label: l10n.merchantOrderCodTotal,
-                    value: formatVnd(order.totalVnd),
-                    emphasize: true,
+                const Divider(height: DealGoSpacing.s24),
+                MerchantMoneyRow(
+                  label: l10n.merchantOrderCodTotal,
+                  value: formatVnd(order.totalVnd),
+                  emphasize: true,
+                ),
+                MerchantMoneyRow(
+                  label: l10n.merchantOrderFoodRevenue,
+                  value: formatVnd(
+                    order.subtotalVnd - (detail?.discountVnd ?? 0),
                   ),
-                  MerchantMoneyRow(
-                    label: l10n.merchantOrderFoodRevenue,
-                    value: formatVnd(order.subtotalVnd),
-                    emphasize: true,
-                  ),
-                ],
+                  emphasize: true,
+                ),
+                const SizedBox(height: DealGoSpacing.s8),
+                Row(
+                  children: [
+                    Icon(
+                      DealGoIcons.card,
+                      size: 14,
+                      color: DealGoColors.textTertiary,
+                    ),
+                    const SizedBox(width: DealGoSpacing.s6),
+                    Text(
+                      'Thanh toán tiền mặt khi nhận hàng (COD)',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: DealGoColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // 9. Pending Change & Message
+          if (pendingChange case final change?) ...[
+            const SizedBox(height: DealGoSpacing.s12),
+            MerchantNote(
+              key: const Key('merchant-change-pending'),
+              message: l10n.merchantChangePending(
+                formatVnd(change.newTotalVnd),
+                DateFormat('HH:mm').format(change.expiresAt.toLocal()),
               ),
             ),
-          ],
-          if (isPlaced || preparing) ...[
-            const SizedBox(height: DealGoSpacing.s12),
-            if (pendingChange case final change?)
-              MerchantNote(
-                key: const Key('merchant-change-pending'),
-                message: l10n.merchantChangePending(
-                  formatVnd(change.newTotalVnd),
-                  DateFormat('HH:mm').format(change.expiresAt.toLocal()),
-                ),
-              )
-            else if (lines.any((line) => line.id != null))
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  key: const Key('merchant-edit-order'),
-                  onPressed: busy ? null : onEditOrder,
-                  icon: const Icon(DealGoIcons.edit),
-                  label: Text(l10n.merchantEditOrder),
-                ),
-              ),
           ],
           if (message != null) ...[
             const SizedBox(height: DealGoSpacing.s12),
@@ -676,64 +880,106 @@ class _MerchantRejectDialogState extends State<MerchantRejectDialog> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final textTheme = Theme.of(context).textTheme;
-    return AlertDialog(
-      title: Text(l10n.merchantRejectConfirmTitle),
-      content: SingleChildScrollView(
+    return Dialog(
+      backgroundColor: DealGoColors.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(DealGoRadius.card),
+        side: BorderSide(color: DealGoColors.border),
+      ),
+      insetPadding: const EdgeInsets.symmetric(
+        horizontal: DealGoDimensions.pageGutter,
+        vertical: DealGoSpacing.s24,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          DealGoSpacing.s20,
+          DealGoSpacing.s20,
+          DealGoSpacing.s20,
+          DealGoSpacing.s16,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Text(l10n.merchantRejectConfirmTitle, style: textTheme.titleMedium),
+            const SizedBox(height: DealGoSpacing.s4),
             Text(l10n.merchantRejectConfirmBody, style: textTheme.bodySmall),
-            const SizedBox(height: DealGoSpacing.s8),
-            Text(l10n.merchantRejectReasonTitle, style: textTheme.labelLarge),
-            RadioGroup<FoodRejectReason>(
-              groupValue: _reason,
-              onChanged: (value) => setState(() => _reason = value),
-              child: Column(
-                children: [
-                  for (final reason in FoodRejectReason.storeChoices)
-                    RadioListTile<FoodRejectReason>(
-                      key: Key('merchant-reject-reason-${reason.wire}'),
-                      value: reason,
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(foodRejectReasonLabel(l10n, reason)),
+            const SizedBox(height: DealGoSpacing.s12),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.merchantRejectReasonTitle,
+                      style: textTheme.labelLarge,
                     ),
-                ],
+                    const SizedBox(height: DealGoSpacing.s4),
+                    RadioGroup<FoodRejectReason>(
+                      groupValue: _reason,
+                      onChanged: (value) => setState(() => _reason = value),
+                      child: Column(
+                        children: [
+                          for (final reason in FoodRejectReason.storeChoices)
+                            RadioListTile<FoodRejectReason>(
+                              key: Key('merchant-reject-reason-${reason.wire}'),
+                              value: reason,
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(foodRejectReasonLabel(l10n, reason)),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: DealGoSpacing.s8),
+                    DealGoTextField(
+                      label: _reason == FoodRejectReason.other
+                          ? l10n.merchantRejectNoteRequired
+                          : l10n.merchantRejectNoteOptional,
+                      hint: 'VD: Quán đã hết nguyên liệu để làm món...',
+                      controller: _note,
+                      fieldKey: const Key('merchant-reject-note'),
+                      maxLength: foodRejectNoteMax,
+                      maxLines: 2,
+                      textInputAction: TextInputAction.done,
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ],
+                ),
               ),
             ),
-            DealGoTextField(
-              label: _reason == FoodRejectReason.other
-                  ? l10n.merchantRejectNoteRequired
-                  : l10n.merchantRejectNoteOptional,
-              controller: _note,
-              fieldKey: const Key('merchant-reject-note'),
-              maxLength: foodRejectNoteMax,
-              maxLines: 2,
-              onChanged: (_) => setState(() {}),
+            const SizedBox(height: DealGoSpacing.s16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  key: const Key('merchant-reject-keep'),
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(l10n.merchantRejectKeep),
+                ),
+                const SizedBox(width: DealGoSpacing.s8),
+                TextButton(
+                  key: const Key('merchant-reject-confirm'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: DealGoColors.danger,
+                  ),
+                  onPressed: _valid
+                      ? () {
+                          final note = _note.text.trim();
+                          Navigator.of(context).pop((
+                            reason: _reason!,
+                            note: note.isEmpty ? null : note,
+                          ));
+                        }
+                      : null,
+                  child: Text(l10n.merchantRejectConfirmCta),
+                ),
+              ],
             ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          key: const Key('merchant-reject-keep'),
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(l10n.merchantRejectKeep),
-        ),
-        TextButton(
-          key: const Key('merchant-reject-confirm'),
-          onPressed: _valid
-              ? () {
-                  final note = _note.text.trim();
-                  Navigator.of(
-                    context,
-                  ).pop((reason: _reason!, note: note.isEmpty ? null : note));
-                }
-              : null,
-          child: Text(l10n.merchantRejectConfirmCta),
-        ),
-      ],
     );
   }
 }

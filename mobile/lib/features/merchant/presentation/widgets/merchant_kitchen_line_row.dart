@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_money.dart';
 import '../../../food/presentation/widgets/food_order_extras.dart';
+import '../../../food/presentation/widgets/food_widgets.dart';
 import '../utils/merchant_kitchen_lines.dart';
 
 class MerchantKitchenLineRow extends StatelessWidget {
@@ -18,16 +18,9 @@ class MerchantKitchenLineRow extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     return Row(
       children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(DealGoRadius.small),
-          child: Container(
-            width: 44,
-            height: 44,
-            color: DealGoColors.amberSurface,
-            child: Center(
-              child: Icon(DealGoIcons.food, size: 20, color: DealGoColors.amber),
-            ),
-          ),
+        FoodThumb(
+          size: 44,
+          imageUrl: line.imageUrl,
         ),
         const SizedBox(width: DealGoSpacing.s12),
         Expanded(

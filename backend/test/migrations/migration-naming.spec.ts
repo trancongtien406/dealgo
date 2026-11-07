@@ -14,7 +14,7 @@ import { join } from 'node:path';
  */
 const MIGRATIONS_DIR = join(__dirname, '..', '..', 'prisma', 'migrations');
 
-const KNOWN_SHARED_TIMESTAMPS = new Set(['20261014160000']);
+const KNOWN_SHARED_TIMESTAMPS = new Set(['20261014160000', '20261107090000']);
 
 const KNOWN_TAGGED = new Set([
   '20261105090000_r18_dispatch_lifecycle',

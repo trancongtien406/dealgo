@@ -55,12 +55,17 @@ export function checkOpsStaffRoleChange(input: {
   return { ok: true, value: { staffRole: role as OpsStaffRoleCode, reason: reason.value.reason } };
 }
 
-/** The button shows only for a super-admin viewing an Admin-password staff row. */
+/** The button shows only for a super-admin viewing a non-super-admin Admin row. Super admin cannot be revoked. */
 export function canChangeSuperAdmin(
   me: { id: string; superAdmin: boolean } | null | undefined,
-  person: { id?: string; roleCode?: string },
+  person: { id?: string; roleCode?: string; superAdmin?: boolean },
 ): boolean {
-  return Boolean(me?.superAdmin && person.id && person.roleCode === "ADMIN");
+  return Boolean(
+    me?.superAdmin &&
+      person.id &&
+      person.roleCode === "ADMIN" &&
+      !person.superAdmin,
+  );
 }
 
 /** Vietnamese copy for the Nest error codes of these Admin actions (null = keep upstream text). */
@@ -68,8 +73,12 @@ export function opsAccountActionErrorMessage(code: string | undefined): string |
   switch (code) {
     case "OPS_SUPER_ADMIN_REQUIRED":
       return "Chỉ super-admin mới thực hiện được thao tác này.";
+    case "OPS_SUPER_ADMIN_REVOKE_FORBIDDEN":
+      return "Không thể thu hồi quyền super-admin.";
+    case "OPS_SUPER_ADMIN_ROLE_CHANGE_FORBIDDEN":
+      return "Không thể thay đổi vai trò của super-admin.";
     case "OPS_LAST_SUPER_ADMIN":
-      return "Phải còn ít nhất một super-admin. Hãy cấp quyền cho người khác trước khi thu hồi.";
+      return "Phải còn ít nhất một super-admin.";
     case "OPS_STAFF_NOT_FOUND":
       return "Không tìm thấy nhân sự vận hành.";
     case "OPS_STAFF_NOT_ACTIVE":

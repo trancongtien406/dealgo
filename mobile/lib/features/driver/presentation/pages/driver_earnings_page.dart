@@ -113,16 +113,10 @@ class _DriverEarningsViewState extends State<_DriverEarningsView> {
     if (state.status == DriverHistoryStatus.failed && summary == null) {
       return DealGoRefresh(
         onRefresh: cubit.load,
-        child: ListView(
-          padding: dealGoScrollPadding(context, _padding),
-          children: [
-            DealGoStateView.failure(
-              context,
-              onRetry: cubit.load,
-              cause: state.cause,
-              compact: true,
-            ),
-          ],
+        child: DealGoStateView.failure(
+          context,
+          onRetry: cubit.load,
+          cause: state.cause,
         ),
       );
     }

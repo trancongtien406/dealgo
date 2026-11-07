@@ -18,7 +18,9 @@ const dealGoMobileSentryDsn =
 /// nothing. `--dart-define=SENTRY_DSN=` (empty) turns it off for a build.
 const sentryDsn = String.fromEnvironment(
   'SENTRY_DSN',
-  defaultValue: flutterAppFlavor != '' || kReleaseMode ? dealGoMobileSentryDsn : '',
+  defaultValue: flutterAppFlavor != '' || kReleaseMode
+      ? dealGoMobileSentryDsn
+      : '',
 );
 
 /// `dev` / `prod`, from the flavor (release builds without one count as prod).
@@ -94,7 +96,9 @@ Future<void> initFirebaseCrashlytics() async {
     };
 
     if (kDebugMode) {
-      debugPrint('[Crashlytics] Firebase Crashlytics initialized (enabled=$enabled)');
+      debugPrint(
+        '[Crashlytics] Firebase Crashlytics initialized (enabled=$enabled)',
+      );
     }
   } catch (error) {
     if (kDebugMode) {
@@ -125,14 +129,25 @@ void setObservabilityUser(String? userId, {String? role}) {
 bool isExpectedTransportClose(SentryEvent event) {
   final original = event.throwable;
   final names = <String>[
-    if (original != null) original.runtimeType.toString(),
+    if (original != null) ...[
+      original.runtimeType.toString(),
+      original.toString(),
+    ],
     for (final e in event.exceptions ?? const <SentryException>[]) ...[
       e.type ?? '',
       e.value ?? '',
     ],
-  ].join(' ');
-  return names.contains('WebSocketConnectionClosed') ||
-      names.contains('WebSocketChannelException') && names.contains('closed');
+  ].join(' ').toLowerCase();
+  if (names.contains('websocketconnectionclosed') ||
+      (names.contains('websocketchannelexception') && names.contains('closed'))) {
+    return true;
+  }
+  if (names.contains('audio device module is unavailable') ||
+      names.contains('audio engine error -4100') ||
+      names.contains('audiosessionexception')) {
+    return true;
+  }
+  return false;
 }
 
 final _urlQuery = RegExp(r'(https?://[^\s?]+)\?[^\s]*');

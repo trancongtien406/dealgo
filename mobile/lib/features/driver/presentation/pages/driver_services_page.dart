@@ -92,8 +92,6 @@ class _DriverServicesPageState extends State<DriverServicesPage> {
               DealGoSpacing.s16,
             ),
             children: [
-              Text(l10n.driverServicesHeadline, style: textTheme.titleLarge),
-              const SizedBox(height: DealGoSpacing.s16),
               DriverPanel(
                 color: online
                     ? DealGoColors.greenSurface

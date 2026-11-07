@@ -161,9 +161,7 @@ class FoodFilterPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final background = selected
-        ? DealGoColors.subtlePurple
-        : DealGoColors.card;
+    final background = selected ? DealGoColors.subtlePurple : DealGoColors.card;
     final borderColor = selected ? DealGoColors.primary : DealGoColors.border;
     final foreground = selected
         ? DealGoColors.primary
@@ -210,11 +208,7 @@ class FoodFilterPill extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: onTap == null
           ? content
-          : InkWell(
-              onTap: onTap,
-              customBorder: shape,
-              child: content,
-            ),
+          : InkWell(onTap: onTap, customBorder: shape, child: content),
     );
 
     return Semantics(
@@ -248,7 +242,7 @@ class FoodFilterIconButton extends StatelessWidget {
     return Material(
       color: _active ? DealGoColors.primary : DealGoColors.card,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(DealGoRadius.button),
+        borderRadius: BorderRadius.circular(DealGoRadius.input),
         side: BorderSide(
           color: _active ? DealGoColors.primary : DealGoColors.border,
         ),
@@ -441,9 +435,8 @@ class _FoodFilterSheetState extends State<_FoodFilterSheet> {
                     ),
                   ),
                   IconButton(
-                    tooltip: MaterialLocalizations.of(
-                      context,
-                    ).closeButtonTooltip,
+                    tooltip: MaterialLocalizations.of(context)
+                        .closeButtonTooltip,
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(DealGoIcons.close),
                   ),
@@ -655,10 +648,8 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       title,
-      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-        fontWeight: FontWeight.w700,
-        color: DealGoColors.text,
-      ),
+      style: Theme.of(context).textTheme.labelLarge
+          ?.copyWith(fontWeight: FontWeight.w700, color: DealGoColors.text),
     );
   }
 }
@@ -701,9 +692,8 @@ class _DistanceSelectorSection extends StatelessWidget {
                   const SizedBox(height: DealGoSpacing.s2),
                   Text(
                     l10n.foodFilterDistanceHint,
-                    style: DealGoType.micro(
-                      textTheme,
-                    ).copyWith(color: DealGoColors.textSecondary),
+                    style: DealGoType.micro(textTheme)
+                        .copyWith(color: DealGoColors.textSecondary),
                   ),
                 ],
               ),
@@ -808,15 +798,19 @@ class _DistanceSelectorSection extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    for (final label in const ['1 km', '5 km', '10 km', '15 km+'])
+                    for (final label in const [
+                      '1 km',
+                      '5 km',
+                      '10 km',
+                      '15 km+',
+                    ])
                       Flexible(
                         child: Text(
                           label,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: DealGoType.micro(
-                            textTheme,
-                          ).copyWith(color: DealGoColors.textSecondary),
+                          style: DealGoType.micro(textTheme)
+                              .copyWith(color: DealGoColors.textSecondary),
                         ),
                       ),
                   ],

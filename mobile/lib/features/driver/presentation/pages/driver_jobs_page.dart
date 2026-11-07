@@ -236,95 +236,113 @@ class _JobsOnline extends StatelessWidget {
                 onPressed: () => _openFirst(context, ready),
               ),
             ),
-      body: DealGoRefresh(
-        onRefresh: onRetry,
-        child: ListView(
-          padding: dealGoScrollPadding(
-            context,
-            const EdgeInsets.fromLTRB(
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
               DealGoDimensions.pageGutter,
               DealGoSpacing.s8,
               DealGoDimensions.pageGutter,
-              DealGoSpacing.s16,
+              DealGoSpacing.s8,
+            ),
+            child: DriverPanel(
+              elevated: true,
+              padding: const EdgeInsets.fromLTRB(
+                DealGoSpacing.s12,
+                DealGoSpacing.s4,
+                DealGoSpacing.s4,
+                DealGoSpacing.s12,
+              ),
+              child: DriverServiceStrip(
+                key: const Key('driver-jobs-services'),
+                prefs: services,
+                vehicleClassCode: vehicleClass,
+                showStatus: true,
+                online: true,
+                settingsKey: const Key('driver-jobs-open-services'),
+                onOpenSettings: () => context.push(DriverRoutes.services),
+                pillKeyFor: (kind) => Key('driver-jobs-service-${kind.name}'),
+              ),
             ),
           ),
-          children: [
-          DriverPanel(
-            elevated: true,
-            padding: const EdgeInsets.fromLTRB(
-              DealGoSpacing.s12,
-              DealGoSpacing.s4,
-              DealGoSpacing.s4,
-              DealGoSpacing.s12,
-            ),
-            child: DriverServiceStrip(
-              key: const Key('driver-jobs-services'),
-              prefs: services,
-              vehicleClassCode: vehicleClass,
-              showStatus: true,
-              online: true,
-              settingsKey: const Key('driver-jobs-open-services'),
-              onOpenSettings: () => context.push(DriverRoutes.services),
-              pillKeyFor: (kind) => Key('driver-jobs-service-${kind.name}'),
-            ),
-          ),
-          const SizedBox(height: DealGoSpacing.s12),
-          if (loading) const DealGoSkeletonList(itemCount: 3),
-          if (failed != null)
-            DealGoStateView.failure(
-              context,
-              onRetry: onRetry,
-              cause: failed.sessionExpired
-                  ? sessionExpiredFailure
-                  : failed.error,
-              message: failed.sessionExpired
-                  ? l10n.errorSessionExpired
-                  : apiErrorText(
-                      l10n,
-                      failed.error,
-                      fallback: l10n.driverLoadRequestsFailed,
+          Expanded(
+            child: DealGoRefresh(
+              onRefresh: onRetry,
+              child: loading
+                  ? const DealGoSkeletonList(itemCount: 3)
+                  : failed != null
+                  ? DealGoStateView.failure(
+                      context,
+                      onRetry: onRetry,
+                      cause: failed.sessionExpired
+                          ? sessionExpiredFailure
+                          : failed.error,
+                      message: failed.sessionExpired
+                          ? l10n.errorSessionExpired
+                          : apiErrorText(
+                              l10n,
+                              failed.error,
+                              fallback: l10n.driverLoadRequestsFailed,
+                            ),
+                    )
+                  : (ready != null && ready.rides.isEmpty && ready.food.isEmpty)
+                  ? DealGoStateView(
+                      art: DealGoStateArt.noOrders,
+                      title: driverEnabledServiceCount(services, vehicleClass) > 0
+                          ? l10n.driverNoOpenRequests
+                          : l10n.driverServicesNoneOn,
+                    )
+                  : ListView(
+                      padding: dealGoScrollPadding(
+                        context,
+                        const EdgeInsets.fromLTRB(
+                          DealGoDimensions.pageGutter,
+                          0,
+                          DealGoDimensions.pageGutter,
+                          DealGoSpacing.s16,
+                        ),
+                      ),
+                      children: [
+                        if (ready != null && ready.rides.isNotEmpty) ...[
+                          Text(
+                            '${l10n.driverRidesAvailable} · ${ready.rides.length}',
+                            style: textTheme.titleSmall,
+                          ),
+                          const SizedBox(height: DealGoSpacing.s8),
+                          for (final ride in ready.rides) ...[
+                            _RideJobCard(ride: ride),
+                            const SizedBox(height: DealGoSpacing.s8),
+                          ],
+                        ],
+                        if (ready != null && ready.food.isNotEmpty) ...[
+                          Text(
+                            l10n.driverFoodAvailable,
+                            style: textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: DealGoSpacing.s8),
+                          for (final job in ready.food) ...[
+                            _FoodJobCard(job: job),
+                            const SizedBox(height: DealGoSpacing.s12),
+                          ],
+                        ],
+                        Text(
+                          AppLocalizations.of(context).driverJobsHistorySection,
+                          style: textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: DealGoSpacing.s8),
+                        TextButton(
+                          key: const Key('driver-open-history'),
+                          onPressed: () => context.go('/driver/earnings'),
+                          child: Text(
+                            AppLocalizations.of(context).driverOpenHistory,
+                          ),
+                        ),
+                      ],
                     ),
-              compact: true,
             ),
-          if (ready != null && ready.rides.isEmpty && ready.food.isEmpty)
-            DealGoStateView(
-              art: DealGoStateArt.noOrders,
-              title: driverEnabledServiceCount(services, vehicleClass) > 0
-                  ? l10n.driverNoOpenRequests
-                  : l10n.driverServicesNoneOn,
-              compact: true,
-            ),
-          if (ready != null && ready.rides.isNotEmpty) ...[
-            Text(
-              '${l10n.driverRidesAvailable} · ${ready.rides.length}',
-              style: textTheme.titleSmall,
-            ),
-            const SizedBox(height: DealGoSpacing.s8),
-            for (final ride in ready.rides) ...[
-              _RideJobCard(ride: ride),
-              const SizedBox(height: DealGoSpacing.s8),
-            ],
-          ],
-          if (ready != null && ready.food.isNotEmpty) ...[
-            Text(l10n.driverFoodAvailable, style: textTheme.titleMedium),
-            const SizedBox(height: DealGoSpacing.s8),
-            for (final job in ready.food) ...[
-              _FoodJobCard(job: job),
-              const SizedBox(height: DealGoSpacing.s12),
-            ],
-          ],
-          Text(
-            AppLocalizations.of(context).driverJobsHistorySection,
-            style: textTheme.titleMedium,
-          ),
-          const SizedBox(height: DealGoSpacing.s8),
-          TextButton(
-            key: const Key('driver-open-history'),
-            onPressed: () => context.go('/driver/earnings'),
-            child: Text(AppLocalizations.of(context).driverOpenHistory),
           ),
         ],
-        ),
       ),
     );
   }

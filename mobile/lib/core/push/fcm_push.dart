@@ -10,6 +10,7 @@ import '../../firebase_options.dart';
 import '../network/api_paths.dart';
 import '../network/dealgo_dio.dart';
 import '../network/dio_mapper.dart';
+import '../auth/secure_token_store.dart';
 import 'push_port.dart';
 
 /// Top-level FCM background entry point (must be registered before [runApp]).
@@ -34,6 +35,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       Map<String, Object?>.of(message.data),
       title: message.notification?.title ?? _dataText(message, 'title'),
       body: message.notification?.body ?? _dataText(message, 'body'),
+      tokenStore: SecureTokenStore(),
     );
   } catch (error) {
     if (kDebugMode) {
@@ -269,42 +271,60 @@ class FcmPush implements PushPort {
     _registeredForAccessToken = null;
     _accessToken = null;
     _postedVoip = null;
-    if (!_firebaseReady || accessToken.isEmpty) {
+    if (!_firebaseReady) {
       return;
     }
+    String? token;
     try {
-      final voip = await voipToken?.call();
-      if (voip != null && voip.isNotEmpty) {
-        await dio.delete<Object?>(
-          ApiPaths.mePushTokens,
-          data: {'token': voip},
-          options: Options(
-            headers: {'Authorization': 'Bearer $accessToken'},
-            extra: const {skipAuthRefreshExtra: true},
-          ),
-        );
-      }
+      token = await currentToken();
+    } catch (_) {}
+
+    String? voip;
+    try {
+      voip = await voipToken?.call();
+    } catch (_) {}
+
+    try {
+      // ignore: deprecated_member_use
+      await FirebaseMessaging.instance.deleteToken();
     } catch (error) {
       if (kDebugMode) {
-        debugPrint('VoIP token unregister failed: $error');
+        debugPrint('FCM deleteToken failed: $error');
       }
     }
-    try {
-      final token = await currentToken();
-      if (token == null || token.isEmpty) {
-        return;
+
+    if (accessToken.isNotEmpty) {
+      if (voip != null && voip.isNotEmpty) {
+        try {
+          await dio.delete<Object?>(
+            ApiPaths.mePushTokens,
+            data: {'token': voip},
+            options: Options(
+              headers: {'Authorization': 'Bearer $accessToken'},
+              extra: const {skipAuthRefreshExtra: true},
+            ),
+          );
+        } catch (error) {
+          if (kDebugMode) {
+            debugPrint('VoIP token unregister failed: $error');
+          }
+        }
       }
-      await dio.delete<Object?>(
-        ApiPaths.mePushTokens,
-        data: {'token': token},
-        options: Options(
-          headers: {'Authorization': 'Bearer $accessToken'},
-          extra: const {skipAuthRefreshExtra: true},
-        ),
-      );
-    } catch (error) {
-      if (kDebugMode) {
-        debugPrint('FCM unregister failed: $error');
+      if (token != null && token.isNotEmpty) {
+        try {
+          await dio.delete<Object?>(
+            ApiPaths.mePushTokens,
+            data: {'token': token},
+            options: Options(
+              headers: {'Authorization': 'Bearer $accessToken'},
+              extra: const {skipAuthRefreshExtra: true},
+            ),
+          );
+        } catch (error) {
+          if (kDebugMode) {
+            debugPrint('FCM unregister failed: $error');
+          }
+        }
       }
     }
   }

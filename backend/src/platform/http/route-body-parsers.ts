@@ -4,8 +4,8 @@ import { UPLOAD_MAX_FILE_KB_CEILING } from '../settings/platform-settings.catalo
 
 export const AVATAR_UPLOAD_PATH = '/v1/me/avatar';
 
-/** Merchant menu item photo upload (POST .../items/:id/image). */
-export const MENU_ITEM_IMAGE_JSON_LIMIT = '3mb';
+/** Merchant menu item form + photo upload (POST/PATCH /v1/food/merchant/items...). */
+export const MENU_ITEM_IMAGE_JSON_LIMIT = '16mb';
 
 // UploadAvatarDto accepts up to 2,000,000 base64 characters; leave room for JSON framing.
 export const AVATAR_JSON_LIMIT = '3mb';
@@ -40,9 +40,9 @@ export const SES_WEBHOOK_JSON_LIMIT = '256kb';
  */
 export function registerRouteBodyParsers(app: INestApplication): void {
   app.use(AVATAR_UPLOAD_PATH, wrap(json({ limit: AVATAR_JSON_LIMIT })));
-  // Express path-to-regexp: menu item image upload under merchant catalog.
+  // Express prefix mount: covers POST /items, PATCH /items/:itemId, and POST /items/:itemId/image.
   app.use(
-    '/v1/food/merchant/items/:itemId/image',
+    '/v1/food/merchant/items',
     wrap(json({ limit: MENU_ITEM_IMAGE_JSON_LIMIT })),
   );
   app.use(

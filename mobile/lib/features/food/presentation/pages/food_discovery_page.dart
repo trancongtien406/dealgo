@@ -7,7 +7,6 @@ import '../../../../core/design_system/components/dealgo_profile_avatar.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/components/dealgo_haptics.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
-import '../../../../core/design_system/tokens/dealgo_type_scale.dart';
 import '../../../../core/motion/dealgo_motion_widgets.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../home_banner/presentation/home_banner_carousel.dart';
@@ -661,27 +660,31 @@ class _SearchRow extends StatelessWidget {
           child: InkWell(
             key: const Key('food-search-entry'),
             onTap: onOpenSearch,
-            borderRadius: BorderRadius.circular(DealGoRadius.button),
+            borderRadius: BorderRadius.circular(DealGoRadius.input),
             child: InputDecorator(
               decoration: InputDecoration(
                 filled: true,
                 fillColor: DealGoColors.card,
+                isDense: true,
                 prefixIcon: const Icon(
                   DealGoIcons.search,
                   color: DealGoColors.primary,
+                  size: 20,
                 ),
                 contentPadding: const EdgeInsets.symmetric(
-                  vertical: DealGoSpacing.s12,
+                  horizontal: DealGoSpacing.s16,
+                  vertical: DealGoSpacing.s14,
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(DealGoRadius.button),
+                  borderRadius: BorderRadius.circular(DealGoRadius.input),
                   borderSide: BorderSide(color: DealGoColors.border),
                 ),
               ),
               child: Text(
                 l10n.foodDiscoverySearchHint,
-                style: DealGoType.body(Theme.of(context).textTheme)
-                    .copyWith(color: DealGoColors.textSecondary),
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: DealGoColors.textTertiary,
+                ),
               ),
             ),
           ),

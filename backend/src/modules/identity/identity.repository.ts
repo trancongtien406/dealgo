@@ -237,6 +237,7 @@ export type PasskeyRecord = {
   transports: string[];
   deviceType: string | null;
   backedUp: boolean;
+  createdAt: Date;
 };
 
 export type PasskeyChallengeRecord = {
@@ -484,6 +485,8 @@ export interface IdentityRepository {
   saveCustomerCredential(userId: string, passwordHash: string): Promise<void>;
 
   listPasskeys(userId: string): Promise<PasskeyRecord[]>;
+  /** Removes one passkey owned by [userId]; false when it does not exist. */
+  deletePasskey(userId: string, id: string): Promise<boolean>;
   findPasskeyByCredentialId(
     credentialId: string,
   ): Promise<PasskeyRecord | null>;
@@ -1230,6 +1233,12 @@ export class MemoryIdentityRepository implements IdentityRepository {
       if (!roleGrant) {
         continue;
       }
+      if (role === 'OPS') {
+        const cred = this.credentials.get(user.id);
+        if (cred?.superAdmin === true) {
+          continue;
+        }
+      }
       if (filter?.q && filter.q.trim()) {
         const q = filter.q.trim().toLowerCase();
         const matches =
@@ -1476,6 +1485,13 @@ export class MemoryIdentityRepository implements IdentityRepository {
     );
   }
 
+  async deletePasskey(userId: string, id: string): Promise<boolean> {
+    const passkey = this.passkeys.get(id);
+    if (!passkey || passkey.userId !== userId) return false;
+    this.passkeys.delete(id);
+    return true;
+  }
+
   async findPasskeyByCredentialId(
     credentialId: string,
   ): Promise<PasskeyRecord | null> {
@@ -1507,6 +1523,7 @@ export class MemoryIdentityRepository implements IdentityRepository {
       transports: [...input.transports],
       deviceType: input.deviceType,
       backedUp: input.backedUp,
+      createdAt: new Date(),
     };
     this.passkeys.set(passkey.id, passkey);
     return passkey;

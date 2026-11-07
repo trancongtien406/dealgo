@@ -153,15 +153,49 @@ class _PlaceButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cart = context.watch<FoodCartCubit>().state;
-    return DealGoPrimaryButton(
-      key: const Key('food-place-order'),
-      label: AppLocalizations.of(context)
-          .checkoutPlaceTotal(formatVnd(cart.previewTotalVnd)),
-      trailingIcon: DealGoIcons.arrowRight,
-      enabled: cart.canCheckout,
-      onPressed: () => onSubmit(),
+    final l10n = AppLocalizations.of(context);
+    final blocker = checkoutBlockingMessage(cart, l10n);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (blocker != null) ...[
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              blocker,
+              key: const Key('food-checkout-blocker'),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: DealGoColors.warning,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(height: DealGoSpacing.s8),
+        ],
+        DealGoPrimaryButton(
+          key: const Key('food-place-order'),
+          label: l10n.checkoutPlaceTotal(formatVnd(cart.previewTotalVnd)),
+          trailingIcon: DealGoIcons.arrowRight,
+          onPressed: () => onSubmit(),
+        ),
+      ],
     );
   }
+}
+
+String? checkoutBlockingMessage(FoodCartState cart, AppLocalizations l10n) {
+  if (cart.lines.isEmpty) return l10n.checkoutEmptyBody;
+  if (!cart.hasDropoff) return l10n.foodDropoffChoose;
+  if (cart.minOrderShortVnd > 0) {
+    return '${l10n.checkoutErrMinOrder}. ${l10n.voucherNeedMore(formatVnd(cart.minOrderShortVnd))}.';
+  }
+  if (cart.deliveryFareVnd == null) return l10n.foodFareNeedAddress;
+  if (cart.voucherCode != null && cart.voucherDiscountVnd <= 0) {
+    return l10n.checkoutVoucherRejected;
+  }
+  if (!cart.canCheckout) return l10n.checkoutErrGeneric;
+  return null;
 }
 
 class _OfflineButtons extends StatelessWidget {
@@ -1109,6 +1143,15 @@ class _CheckoutVoucherPanelState extends State<_CheckoutVoucherPanel> {
               context.read<FoodCartCubit>().applyVoucher(
                 code: applied,
                 discountVnd: quote?.discountVnd ?? 0,
+              );
+            },
+            onRejected: (code, _) {
+              if (_appliedCode != null) {
+                setState(() => _appliedCode = null);
+              }
+              context.read<FoodCartCubit>().applyVoucher(
+                code: code,
+                discountVnd: 0,
               );
             },
           ),

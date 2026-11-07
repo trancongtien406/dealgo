@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/design_system/components/dealgo_app_header.dart';
 import '../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../core/network/request_failure.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
@@ -118,7 +119,7 @@ class _NotificationPrefsPageState extends State<NotificationPrefsPage> {
     final prefs = _prefs;
     final textTheme = Theme.of(context).textTheme;
     return Scaffold(
-      backgroundColor: DealGoColors.card,
+      backgroundColor: DealGoColors.canvas,
       appBar: DealGoAppHeader(
         title: l10n.notifPrefsHeader,
         applySafeArea: true,
@@ -126,29 +127,25 @@ class _NotificationPrefsPageState extends State<NotificationPrefsPage> {
       body: SafeArea(
         top: false,
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const _NotificationPrefsSkeleton()
             : prefs == null
             ? DealGoStateView.failure(
                 context,
                 onRetry: _load,
                 cause: _loadFailure,
-                compact: true,
               )
             : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
                     child: ListView(
-                      padding: const EdgeInsets.all(
+                      padding: const EdgeInsets.fromLTRB(
                         DealGoDimensions.pageGutter,
+                        DealGoSpacing.s16,
+                        DealGoDimensions.pageGutter,
+                        DealGoSpacing.s16,
                       ),
                       children: [
-                        Text(
-                          l10n.notifPrefsTitle,
-                          style: textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
                         _Banner(
                           icon: DealGoIcons.notifications,
                           title: l10n.notifPrefsPushOn,
@@ -253,10 +250,16 @@ class _NotificationPrefsPageState extends State<NotificationPrefsPage> {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
+                    padding: const EdgeInsets.fromLTRB(
+                      DealGoDimensions.pageGutter,
+                      DealGoSpacing.s8,
+                      DealGoDimensions.pageGutter,
+                      DealGoSpacing.s12,
+                    ),
                     child: DealGoPrimaryButton(
                       label: l10n.notifPrefsSave,
                       isLoading: _busy,
+                      fullWidth: true,
                       onPressed: _save,
                     ),
                   ),
@@ -276,7 +279,7 @@ class _Banner extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: DealGoColors.primary.withValues(alpha: 0.08),
+        color: DealGoColors.subtlePurple,
         borderRadius: BorderRadius.circular(DealGoRadius.card),
       ),
       child: Padding(
@@ -309,6 +312,7 @@ class _PrefCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
+        color: DealGoColors.card,
         border: Border.all(color: DealGoColors.border),
         borderRadius: BorderRadius.circular(DealGoRadius.card),
       ),
@@ -348,6 +352,190 @@ class _PrefTile extends StatelessWidget {
         value: value,
         onChanged: onChanged,
         activeTrackColor: DealGoColors.primary,
+      ),
+    );
+  }
+}
+
+class _NotificationPrefsSkeleton extends StatelessWidget {
+  const _NotificationPrefsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return DealGoShimmer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: ListView(
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                DealGoDimensions.pageGutter,
+                DealGoSpacing.s16,
+                DealGoDimensions.pageGutter,
+                DealGoSpacing.s16,
+              ),
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(DealGoSpacing.s16),
+                  decoration: BoxDecoration(
+                    color: DealGoColors.card,
+                    borderRadius: BorderRadius.circular(DealGoRadius.card),
+                    border: Border.all(color: DealGoColors.border),
+                  ),
+                  child: const Row(
+                    children: [
+                      DealGoSkeletonBox(
+                        width: 24,
+                        height: 24,
+                        radius: DealGoRadius.small,
+                      ),
+                      SizedBox(width: DealGoSpacing.s12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            DealGoSkeletonBox(height: 14, width: 140),
+                            SizedBox(height: DealGoSpacing.s6),
+                            DealGoSkeletonBox(height: 12),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: 0.3,
+                  child: DealGoSkeletonBox(height: 16),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: DealGoColors.card,
+                    borderRadius: BorderRadius.circular(DealGoRadius.card),
+                    border: Border.all(color: DealGoColors.border),
+                  ),
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < 3; i++) ...[
+                        if (i > 0)
+                          Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: DealGoColors.border,
+                          ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: DealGoSpacing.s16,
+                            vertical: DealGoSpacing.s12,
+                          ),
+                          child: Row(
+                            children: [
+                              DealGoSkeletonBox(
+                                width: 20,
+                                height: 20,
+                                radius: DealGoRadius.small,
+                              ),
+                              SizedBox(width: DealGoSpacing.s12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    DealGoSkeletonBox(height: 14, width: 110),
+                                    SizedBox(height: DealGoSpacing.s6),
+                                    DealGoSkeletonBox(height: 12, width: 170),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(width: DealGoSpacing.s12),
+                              DealGoSkeletonBox(
+                                width: 44,
+                                height: 24,
+                                radius: DealGoRadius.pill,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: 0.2,
+                  child: DealGoSkeletonBox(height: 16),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: DealGoColors.card,
+                    borderRadius: BorderRadius.circular(DealGoRadius.card),
+                    border: Border.all(color: DealGoColors.border),
+                  ),
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < 2; i++) ...[
+                        if (i > 0)
+                          Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: DealGoColors.border,
+                          ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: DealGoSpacing.s16,
+                            vertical: DealGoSpacing.s12,
+                          ),
+                          child: Row(
+                            children: [
+                              DealGoSkeletonBox(
+                                width: 20,
+                                height: 20,
+                                radius: DealGoRadius.small,
+                              ),
+                              SizedBox(width: DealGoSpacing.s12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    DealGoSkeletonBox(height: 14, width: 95),
+                                    SizedBox(height: DealGoSpacing.s6),
+                                    DealGoSkeletonBox(height: 12, width: 150),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(width: DealGoSpacing.s12),
+                              DealGoSkeletonBox(
+                                width: 44,
+                                height: 24,
+                                radius: DealGoRadius.pill,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(
+              DealGoDimensions.pageGutter,
+              DealGoSpacing.s8,
+              DealGoDimensions.pageGutter,
+              DealGoSpacing.s12,
+            ),
+            child: DealGoSkeletonBox(
+              height: DealGoDimensions.buttonMinHeight,
+              radius: DealGoRadius.button,
+            ),
+          ),
+        ],
       ),
     );
   }

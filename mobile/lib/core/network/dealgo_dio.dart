@@ -1,3 +1,5 @@
+import '../../features/account_settings/presentation/session_device.dart';
+
 import 'dart:async';
 
 import 'package:dio/dio.dart';
@@ -359,6 +361,7 @@ class DeviceIdInterceptor extends Interceptor {
   DeviceIdInterceptor(this.deviceIdService);
 
   final DeviceIdService deviceIdService;
+  String? _cachedLabel;
 
   @override
   Future<void> onRequest(
@@ -369,6 +372,13 @@ class DeviceIdInterceptor extends Interceptor {
     if (deviceId.isNotEmpty) {
       options.headers['x-device-id'] = deviceId;
     }
+    try {
+      final label = _cachedLabel ??= await currentDeviceLabel();
+      final safeLabel = toHeaderSafeAscii(label);
+      if (safeLabel.isNotEmpty) {
+        options.headers['x-device-label'] = safeLabel;
+      }
+    } catch (_) {}
     handler.next(options);
   }
 }

@@ -29,6 +29,21 @@ class DioRideRemoteDataSource implements RideRemoteDataSource {
   }
 
   @override
+  Future<void> dismissRide({
+    required String accessToken,
+    required String rideId,
+  }) async {
+    try {
+      await dio.post<void>(
+        ApiPaths.dismissRide(rideId),
+        options: _bearer(accessToken),
+      );
+    } on DioException catch (error) {
+      throw apiExceptionFromDio(error);
+    }
+  }
+
+  @override
   Future<RideViewModel> submitOffer(SubmitRideOfferParams request) {
     return _send(
       () => dio.post<Object?>(

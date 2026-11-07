@@ -10,3 +10,13 @@ class ListOpenDriverRides {
     return _repository.listOpenRides(accessToken);
   }
 }
+
+class DismissDriverRide {
+  const DismissDriverRide(this._repository);
+
+  final DriverJobsRepository _repository;
+
+  Future<void> call({required String accessToken, required String rideId}) {
+    return _repository.dismissRide(accessToken: accessToken, rideId: rideId);
+  }
+}

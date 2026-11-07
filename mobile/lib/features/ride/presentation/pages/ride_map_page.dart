@@ -403,6 +403,25 @@ class _RideMapPageState extends State<RideMapPage> {
         ? MapLatLng(lat: dropoff.lat, lng: dropoff.lng)
         : danangViewportCenter;
 
+    final media = MediaQuery.of(context);
+    final keyboard = media.viewInsets.bottom;
+    if (_showParcelSheet && keyboard > 0 && _sheet.isAttached) {
+      final max = rideSheetMaxSize(media);
+      if (_sheet.size < max - 0.05) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _sheet.isAttached && _sheet.size < max - 0.05) {
+            unawaited(
+              _sheet.animateTo(
+                max,
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutCubic,
+              ),
+            );
+          }
+        });
+      }
+    }
+
     return MultiBlocListener(
       listeners: [
         BlocListener<RideDestinationCubit, PlaceOption?>(
@@ -491,6 +510,7 @@ class _RideMapPageState extends State<RideMapPage> {
                 snapSizes: rideSheetSnapSizes(const [
                   0.4,
                   0.62,
+                  0.85,
                 ], rideSheetMaxSize(MediaQuery.of(context))),
                 builder: (context, scrollController) {
                   final parcelPlaces = _places;

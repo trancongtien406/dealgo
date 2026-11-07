@@ -215,6 +215,7 @@ class _RideCancelViewState extends State<_RideCancelView> {
                       key: const Key('ride-cancel-done'),
                       // QA C9: not a dead end — go straight back to booking.
                       label: l10n.rideCancelBookAgain,
+                      fullWidth: true,
                       onPressed: () => context.go('/customer/book'),
                     )
                   : IntrinsicHeight(

@@ -146,10 +146,38 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
 
   final NativeCallUi _native;
 
-  /// Calls answered on the system call screen: it shows them as connected and
-  /// must be ended there too.
+  /// Calls answered on the system call screen (normalized lowercase IDs): it
+  /// shows them as connected and must be ended there too.
   final Set<String> _nativeAnswered = {};
+
+  /// Normalized IDs already reported via [NativeCallUi.setConnected] during an
+  /// in-app answer while CallKit was ringing, avoiding duplicate transitions.
+  final Set<String> _nativeConnectedReported = {};
+
+  /// Normalized IDs dismissed programmatically from Dart so the plugin's
+  /// echoed `declined` / `ended` events do not call `/decline` or `/end`.
+  final Set<String> _appDismissed = {};
   bool _nativeAutoAccept = false;
+
+  static final RegExp _uuidPattern = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
+
+  static String _normId(String id) => id.trim().toLowerCase();
+
+  static bool _sameId(String? a, String? b) =>
+      a != null && b != null && _normId(a) == _normId(b);
+
+  /// iOS CXCall emits uppercase UUIDs while the backend stores lowercase UUIDs.
+  static String _canonicalCallId(String raw) {
+    final trimmed = raw.trim();
+    return _uuidPattern.hasMatch(trimmed) ? trimmed.toLowerCase() : trimmed;
+  }
+
+  Future<void> _dismissNative(String callId) {
+    _appDismissed.add(_normId(callId));
+    return _native.dismiss(callId);
+  }
 
   final StartVoiceCall _start;
   final AnswerVoiceCall _answer;
@@ -200,9 +228,28 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
   Future<void> onResume() async {
     await _drainPending();
     await _reconcile();
+    if (state.phase == VoiceCallPhase.idle && _token != null) {
+      for (final ringingId in await _native.ringingCalls()) {
+        final canonicalId = _canonicalCallId(ringingId);
+        await openFromPush({
+          'eventType': 'Call.incoming',
+          'callId': canonicalId,
+        });
+        if (state.phase == VoiceCallPhase.incoming &&
+            _sameId(state.call?.id, canonicalId)) {
+          _markNativeRinging(state.call!.id);
+          break;
+        }
+      }
+    }
     final keep = state.phase == VoiceCallPhase.incoming || _hasCall
         ? state.call?.id
         : null;
+    for (final ringingId in await _native.ringingCalls()) {
+      if (!_sameId(ringingId, keep)) {
+        _appDismissed.add(_normId(ringingId));
+      }
+    }
     await _native.dismissOthers(keep);
   }
 
@@ -222,35 +269,40 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
     }
     // App launched by "answer" on the system call screen (Android, killed app).
     for (final action in await _native.acceptedOnLaunch()) {
-      await _onNativeAction(action);
+      if (!_nativeAnswered.contains(_normId(action.callId))) {
+        await _onNativeAction(action);
+      }
     }
   }
 
   /// Answer / decline on the system call screen (CallKit / ConnectionService).
   Future<void> _onNativeAction(NativeCallAction action) async {
+    final callId = _canonicalCallId(action.callId);
+    final normId = _normId(callId);
     final ringingHere =
         state.phase == VoiceCallPhase.incoming &&
-        state.call?.id == action.callId;
-    final liveHere = state.call?.id == action.callId && _hasCall;
+        _sameId(state.call?.id, callId);
+    final liveHere = _sameId(state.call?.id, callId) && _hasCall;
     switch (action.type) {
       case NativeCallActionType.accepted:
+        _appDismissed.remove(normId);
         if (ringingHere) {
-          _nativeAnswered.add(action.callId);
+          _nativeAnswered.add(normId);
           await accept();
           return;
         }
         if (liveHere) {
           // Answered again from the car head unit / watch while the call is
           // already up here: just keep the system call in step.
-          _nativeAnswered.add(action.callId);
-          await _native.setConnected(action.callId);
+          _nativeAnswered.add(normId);
+          await _native.setConnected(state.call!.id);
           return;
         }
-        _nativeAnswered.add(action.callId);
+        _nativeAnswered.add(normId);
         final data = <String, Object?>{
           ...action.data,
           'eventType': 'Call.incoming',
-          'callId': action.callId,
+          'callId': callId,
         };
         if (_token == null) {
           _pendingPush = data;
@@ -258,19 +310,28 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
           return;
         }
         await openFromPush(data);
-        await _acceptRinging(action.callId);
+        await _acceptRinging(callId);
       case NativeCallActionType.declined:
+        if (_appDismissed.remove(normId)) {
+          return;
+        }
         if (ringingHere) {
           await decline();
-        } else if (!(state.call?.id == action.callId && state.busy)) {
-          await _declineOnServer(action.callId);
+        } else if (!(_sameId(state.call?.id, callId) && state.busy)) {
+          await _declineOnServer(callId);
         }
       case NativeCallActionType.ended:
         // Hung up from the system UI (Android notification, iOS lock screen).
         // Our own dismiss() echoes back as `ended` too, but by then the id has
         // left [_nativeAnswered].
-        final answeredNatively = _nativeAnswered.remove(action.callId);
-        if (answeredNatively && state.call?.id == action.callId && _hasCall) {
+        if (_appDismissed.remove(normId)) {
+          _nativeAnswered.remove(normId);
+          _nativeConnectedReported.remove(normId);
+          return;
+        }
+        final answeredNatively = _nativeAnswered.remove(normId);
+        _nativeConnectedReported.remove(normId);
+        if (answeredNatively && _sameId(state.call?.id, callId) && _hasCall) {
           await hangUp();
         } else if (!answeredNatively && ringingHere) {
           // Ended from the system ring UI (head unit, watch): the caller is
@@ -278,6 +339,7 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
           await decline();
         }
       case NativeCallActionType.timedOut:
+        _appDismissed.remove(normId);
         // The native timeout fires at the same 36 s as the server window; the
         // server marks the call missed and pushes "Cuộc gọi nhỡ". Ending the
         // local screen keeps both sides consistent if that push is lost.
@@ -286,7 +348,23 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
         }
         return;
       case NativeCallActionType.shown:
-        _markNativeRinging(action.callId);
+        if (ringingHere) {
+          _markNativeRinging(state.call!.id);
+          return;
+        }
+        if (state.phase == VoiceCallPhase.idle && _token != null) {
+          await openFromPush({
+            ...action.data,
+            'eventType': 'Call.incoming',
+            'callId': callId,
+          });
+          if (state.phase == VoiceCallPhase.incoming &&
+              _sameId(state.call?.id, callId)) {
+            _markNativeRinging(state.call!.id);
+          } else if (!state.busy) {
+            await _dismissNative(action.callId);
+          }
+        }
     }
   }
 
@@ -294,7 +372,7 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
   void _markNativeRinging(String callId) {
     if (!isClosed &&
         state.phase == VoiceCallPhase.incoming &&
-        state.call?.id == callId &&
+        _sameId(state.call?.id, callId) &&
         !state.nativeRinging) {
       emit(state.copyWith(nativeRinging: true));
     }
@@ -307,12 +385,15 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
   }
 
   Future<void> _acceptRinging(Object? callId) async {
-    if (state.phase == VoiceCallPhase.incoming && state.call?.id == callId) {
+    if (callId is String &&
+        state.phase == VoiceCallPhase.incoming &&
+        _sameId(state.call?.id, callId)) {
       await accept();
     } else if (callId is String) {
       // No longer ringing (missed or cancelled meanwhile): clear the system UI.
-      _nativeAnswered.remove(callId);
-      await _native.dismiss(callId);
+      _nativeAnswered.remove(_normId(callId));
+      _nativeConnectedReported.remove(_normId(callId));
+      await _dismissNative(callId);
     }
   }
 
@@ -327,24 +408,28 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
     if (id == null || before.call?.calleeUserId != _currentUserId()) {
       return;
     }
-    final sameCall = after.call?.id == id;
+    final normId = _normId(id);
+    final sameCall = _sameId(after.call?.id, id);
     if (after.phase == VoiceCallPhase.active &&
         before.phase != VoiceCallPhase.active &&
-        _nativeAnswered.contains(id)) {
-      unawaited(_native.setConnected(id));
+        _nativeAnswered.contains(normId)) {
+      if (!_nativeConnectedReported.remove(normId)) {
+        unawaited(_native.setConnected(id));
+      }
       return;
     }
     final stoppedRinging =
         before.phase == VoiceCallPhase.incoming &&
         !(sameCall && after.phase == VoiceCallPhase.incoming) &&
-        !_nativeAnswered.contains(id);
+        !_nativeAnswered.contains(normId);
     final over =
         !sameCall ||
         after.phase == VoiceCallPhase.ended ||
         after.phase == VoiceCallPhase.idle;
     if (stoppedRinging || (over && before.phase != VoiceCallPhase.ended)) {
-      _nativeAnswered.remove(id);
-      unawaited(_native.dismiss(id));
+      _nativeAnswered.remove(normId);
+      _nativeConnectedReported.remove(normId);
+      unawaited(_dismissNative(id));
     }
   }
 
@@ -410,8 +495,10 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
         await _media.leave();
         return;
       }
-      await _endOnServer(join.call.id);
+      // Transition to failed before ending on the server so the server's own
+      // socket MISSED/CANCELLED echo cannot race ahead as "noAnswer".
       _finish(VoiceCallNotice.failed, error: error);
+      await _endOnServer(join.call.id);
       return;
     }
     if (_epoch != epoch) {
@@ -432,10 +519,14 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
     }
     _ringTimer?.cancel();
     _peerGoneTimer?.cancel();
+    final normCallId = _normId(call.id);
+    final answeredInAppWhileNativeRinging =
+        state.nativeRinging && !_nativeAnswered.contains(normCallId);
     if (state.nativeRinging) {
       // Answered in-app while the system call screen rings this call: keep the
-      // native call alive and let onChange() mark it connected.
-      _nativeAnswered.add(call.id);
+      // native call alive and tell CallKit to fulfill CXAnswerCallAction so its
+      // audio session activates before WebRTC opens the audio engine.
+      _nativeAnswered.add(normCallId);
     }
     final epoch = ++_epoch;
     emit(state.copyWith(phase: VoiceCallPhase.connecting));
@@ -443,10 +534,8 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
       if (_epoch != epoch) {
         return;
       }
-      // Decline first: the caller is still hearing the ringback and would
-      // otherwise wait out the full timeout.
-      await _declineOnServer(call.id);
       _finish(VoiceCallNotice.micDenied);
+      await _declineOnServer(call.id);
       return;
     }
     final VoiceCallJoin join;
@@ -477,20 +566,24 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
       }
       return;
     }
+    if (answeredInAppWhileNativeRinging) {
+      _nativeConnectedReported.add(normCallId);
+      await _native.setConnected(call.id);
+    }
     try {
       await _media.join(
         url: join.session.url ?? '',
         token: join.session.token,
         systemCallOwnsAudio:
-            state.nativeRinging || _nativeAnswered.contains(call.id),
+            state.nativeRinging || _nativeAnswered.contains(normCallId),
       );
     } catch (error) {
       if (_epoch != epoch) {
         await _media.leave();
         return;
       }
-      await _endOnServer(call.id);
       _finish(VoiceCallNotice.failed, error: error);
+      await _endOnServer(call.id);
       return;
     }
     if (_epoch != epoch) {
@@ -555,13 +648,14 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
 
   /// Tapping an incoming-call push opens the answer screen if it still rings.
   Future<void> openFromPush(Map<String, Object?> data) async {
-    final callId = data['callId'];
-    if (data['eventType'] != 'Call.incoming' || callId is! String) {
+    final rawCallId = data['callId'];
+    if (data['eventType'] != 'Call.incoming' || rawCallId is! String) {
       return;
     }
+    final callId = _canonicalCallId(rawCallId);
     final token = _token;
     if (token == null) {
-      _pendingPush = Map<String, Object?>.of(data);
+      _pendingPush = <String, Object?>{...data, 'callId': callId};
       return;
     }
     if (state.busy && state.phase != VoiceCallPhase.ended) {
@@ -617,7 +711,7 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
       return;
     }
     final current = state.call;
-    if (current != null && current.id == call.id) {
+    if (current != null && _sameId(current.id, call.id)) {
       _applyServerState(call);
       return;
     }
@@ -628,6 +722,12 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
         return;
       }
       _ring(call);
+      return;
+    }
+    if (call.status != VoiceCallStatus.ringing && call.calleeUserId == me) {
+      // PushKit / background push may be ringing CallKit while the app missed
+      // the initial RINGING socket frame: take the system UI down immediately.
+      unawaited(_dismissNative(call.id));
     }
   }
 
@@ -659,7 +759,11 @@ class VoiceCallCubit extends Cubit<VoiceCallState> {
     return switch (call.status) {
       VoiceCallStatus.declined => VoiceCallNotice.declined,
       VoiceCallStatus.missed =>
-        iAmCaller ? VoiceCallNotice.noAnswer : VoiceCallNotice.missed,
+        iAmCaller
+            ? (call.endReason == 'CANCELLED'
+                  ? VoiceCallNotice.hungUp
+                  : VoiceCallNotice.noAnswer)
+            : VoiceCallNotice.missed,
       _ => switch (call.endReason) {
         'TRIP_CLOSED' => VoiceCallNotice.tripClosed,
         'TIMEOUT' => VoiceCallNotice.connectionLost,
@@ -864,6 +968,12 @@ void _reportVoiceFailure(Object error) {
         error.errorCode == 'MALFORMED_RESPONSE') {
       reportHandledError(error);
     }
+    return;
+  }
+  final errStr = error.toString().toLowerCase();
+  if (errStr.contains('audio device module is unavailable') ||
+      errStr.contains('audio engine error -4100') ||
+      errStr.contains('audiosessionexception')) {
     return;
   }
   reportHandledError(

@@ -16,18 +16,31 @@ import {
   APP_REVIEW_DEMO_EMAIL,
   APP_REVIEW_SEED_TAG,
   appReviewDb,
+  appReviewId,
+  loadDotEnv,
 } from './seed-app-review.js';
 
 async function main(): Promise<void> {
+  loadDotEnv();
   assertSeedAllowed(process.env);
   const db = appReviewDb();
   const storage = createObjectStorage(process.env);
   try {
-    const user = await db.user.findUnique({ where: { email: APP_REVIEW_DEMO_EMAIL } });
+    const user =
+      (await db.user.findUnique({ where: { id: appReviewId('user') } })) ??
+      (await db.user.findUnique({ where: { email: APP_REVIEW_DEMO_EMAIL } }));
     const removed: Record<string, number> = {};
     const objectKeys: string[] = [];
+    const expectedCustomerIds = Array.from({ length: 5 }, (_, i) =>
+      appReviewId('customer', String(i + 1)),
+    );
     const customers = await db.user.findMany({
-      where: { email: { startsWith: APP_REVIEW_CUSTOMER_EMAIL_PREFIX, endsWith: APP_REVIEW_CUSTOMER_EMAIL_DOMAIN } },
+      where: {
+        OR: [
+          { id: { in: expectedCustomerIds } },
+          { email: { startsWith: APP_REVIEW_CUSTOMER_EMAIL_PREFIX } },
+        ],
+      },
       select: { id: true },
     });
     const customerIds = customers.map((c) => c.id);

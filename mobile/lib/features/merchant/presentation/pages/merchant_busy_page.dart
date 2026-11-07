@@ -162,17 +162,6 @@ class _MerchantBusyPageState extends State<MerchantBusyPage> {
     return ListView(
       padding: dealGoScrollPadding(context, merchantPagePadding),
       children: [
-        Text(
-          l10n.merchantBusyEyebrow,
-          style: textTheme.labelSmall?.copyWith(
-            color: DealGoColors.primary,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.2,
-          ),
-        ),
-        const SizedBox(height: DealGoSpacing.s4),
-        Text(l10n.merchantBusyHeading, style: textTheme.headlineSmall),
-        const SizedBox(height: DealGoSpacing.s16),
         MerchantPanel(
           color: accepting
               ? DealGoColors.greenSurface

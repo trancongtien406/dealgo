@@ -121,11 +121,14 @@ class FirebaseAnalyticsService implements AnalyticsPort {
     required int fareVnd,
     double? distanceKm,
   }) async {
-    await logEvent('ride_requested', parameters: {
-      'vehicle_class': vehicleClass,
-      'fare_vnd': fareVnd,
-      'distance_km': ?distanceKm,
-    });
+    await logEvent(
+      'ride_requested',
+      parameters: {
+        'vehicle_class': vehicleClass,
+        'fare_vnd': fareVnd,
+        'distance_km': ?distanceKm,
+      },
+    );
   }
 
   /// Log food order placed.
@@ -134,11 +137,14 @@ class FirebaseAnalyticsService implements AnalyticsPort {
     required int totalVnd,
     int? itemCount,
   }) async {
-    await logEvent('food_order_placed', parameters: {
-      'order_id': orderId,
-      'value': totalVnd,
-      'currency': 'VND',
-      'item_count': ?itemCount,
-    });
+    await logEvent(
+      'food_order_placed',
+      parameters: {
+        'order_id': orderId,
+        'value': totalVnd,
+        'currency': 'VND',
+        'item_count': ?itemCount,
+      },
+    );
   }
 }

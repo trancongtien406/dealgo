@@ -185,10 +185,8 @@ class _DriverTopUpSheetState extends State<_DriverTopUpSheet> {
           formatVnd(topUp.amountVnd),
           key: const Key('driver-credit-sheet-amount'),
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: DealGoColors.text,
-          ),
+          style: Theme.of(context).textTheme.headlineMedium
+              ?.copyWith(fontWeight: FontWeight.w800, color: DealGoColors.text),
         ),
         const SizedBox(height: DealGoSpacing.s16),
         switch (topUp.status) {
@@ -238,9 +236,8 @@ class _DriverTopUpSheetState extends State<_DriverTopUpSheet> {
           Text(
             l10n.driverCreditScanHint,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: DealGoColors.textSecondary,
-            ),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: DealGoColors.textSecondary),
           ),
         ] else
           _Notice(
@@ -281,17 +278,17 @@ class _DriverTopUpSheetState extends State<_DriverTopUpSheet> {
               const SizedBox(height: DealGoSpacing.s8),
               Text(
                 l10n.driverCreditPaymentReceived,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: Theme.of(context).textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: DealGoSpacing.s4),
               Text(
-                l10n.driverCreditPaymentReceivedBody(formatVnd(topUp.amountVnd)),
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: DealGoColors.textSecondary,
+                l10n.driverCreditPaymentReceivedBody(
+                  formatVnd(topUp.amountVnd),
                 ),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: DealGoColors.textSecondary),
               ),
             ],
           ),
@@ -357,9 +354,8 @@ class _DriverTopUpSheetState extends State<_DriverTopUpSheet> {
           Text(
             l10n.driverCreditWaitingBank,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: DealGoColors.textTertiary,
-            ),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: DealGoColors.textTertiary),
           ),
         ],
       ),
@@ -370,27 +366,28 @@ class _DriverTopUpSheetState extends State<_DriverTopUpSheet> {
         label: l10n.driverCreditClose,
         onPressed: () => Navigator.of(context).maybePop(),
       ),
-      _ => cubit.state.credit?.enabled == true && cubit.state.pending == null
-          ? DealGoPrimaryButton(
-              key: const Key('driver-credit-sheet-new'),
-              label: l10n.driverCreditCreateNew,
-              enabled: !cubit.state.busy,
-              isLoading: cubit.state.submitting,
-              onPressed: () async {
-                final navigator = Navigator.of(context);
-                final created = await cubit.createTopUp(
-                  idempotencyKey:
-                      'topup-${DateTime.now().microsecondsSinceEpoch}',
-                );
-                if (created != null) {
-                  navigator.maybePop();
-                }
-              },
-            )
-          : DealGoPrimaryButton(
-              label: l10n.driverCreditClose,
-              onPressed: () => Navigator.of(context).maybePop(),
-            ),
+      _ =>
+        cubit.state.credit?.enabled == true && cubit.state.pending == null
+            ? DealGoPrimaryButton(
+                key: const Key('driver-credit-sheet-new'),
+                label: l10n.driverCreditCreateNew,
+                enabled: !cubit.state.busy,
+                isLoading: cubit.state.submitting,
+                onPressed: () async {
+                  final navigator = Navigator.of(context);
+                  final created = await cubit.createTopUp(
+                    idempotencyKey:
+                        'topup-${DateTime.now().microsecondsSinceEpoch}',
+                  );
+                  if (created != null) {
+                    navigator.maybePop();
+                  }
+                },
+              )
+            : DealGoPrimaryButton(
+                label: l10n.driverCreditClose,
+                onPressed: () => Navigator.of(context).maybePop(),
+              ),
     };
     return Container(
       padding: const EdgeInsets.fromLTRB(
@@ -439,16 +436,14 @@ class _OrderCodeRow extends StatelessWidget {
               children: [
                 Text(
                   l10n.driverCreditOrderCode,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: DealGoColors.textSecondary,
-                  ),
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: DealGoColors.textSecondary),
                 ),
                 Text(
                   code,
                   key: const Key('driver-credit-order-code'),
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: Theme.of(context).textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ],
             ),
@@ -461,9 +456,9 @@ class _OrderCodeRow extends StatelessWidget {
               if (!context.mounted) {
                 return;
               }
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(l10n.driverCreditCopied)),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(l10n.driverCreditCopied)));
             },
             icon: const Icon(DealGoIcons.copy, size: 18),
           ),
@@ -482,7 +477,10 @@ class _DetailRows extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final locale = Localizations.localeOf(context).toLanguageTag();
-    final created = DateFormat('dd/MM/yyyy HH:mm', locale).format(topUp.createdAt);
+    final created = DateFormat(
+      'dd/MM/yyyy HH:mm',
+      locale,
+    ).format(topUp.createdAt);
     final paidAt = topUp.paidAt;
     return DealGoCard(
       elevated: false,
@@ -537,9 +535,8 @@ class _DetailLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.bodyMedium?.copyWith(
-      fontWeight: strong ? FontWeight.w700 : FontWeight.w500,
-    );
+    final style = Theme.of(context).textTheme.bodyMedium
+        ?.copyWith(fontWeight: strong ? FontWeight.w700 : FontWeight.w500);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: DealGoSpacing.s4),
       child: Row(
@@ -578,10 +575,8 @@ class _Countdown extends StatelessWidget {
       l10n.driverCreditExpiresIn('$minutes:$seconds'),
       key: const Key('driver-credit-countdown'),
       textAlign: TextAlign.center,
-      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-        color: DealGoColors.warning,
-        fontWeight: FontWeight.w600,
-      ),
+      style: Theme.of(context).textTheme.bodySmall
+          ?.copyWith(color: DealGoColors.warning, fontWeight: FontWeight.w600),
     );
   }
 }
@@ -602,9 +597,8 @@ class _Notice extends StatelessWidget {
         Expanded(
           child: Text(
             message,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: DealGoColors.textSecondary,
-            ),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: DealGoColors.textSecondary),
           ),
         ),
       ],

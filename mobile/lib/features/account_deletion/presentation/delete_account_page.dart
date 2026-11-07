@@ -7,11 +7,14 @@ import 'package:intl/intl.dart';
 import '../../../core/design_system/components/dealgo_app_header.dart';
 import '../../../core/design_system/components/dealgo_icon_badge.dart';
 import '../../../core/design_system/components/dealgo_secondary_button.dart';
+import '../../../core/design_system/components/dealgo_skeleton.dart';
+import '../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../core/l10n/api_error_text.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/network/request_failure.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../food/domain/entities/food_money.dart';
 import '../../identity/domain/auth_redirect.dart';
@@ -65,6 +68,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
   var _busy = false;
   String? _error;
   var _mustRestart = false;
+  Object? _failure;
 
   AccountDeletionRepository get _repo =>
       context.read<AccountDeletionRepository>();
@@ -90,10 +94,16 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
   Future<void> _load() async {
     final token = _token;
     if (token == null) {
-      setState(() => _phase = _Phase.loadError);
+      setState(() {
+        _failure = sessionExpiredFailure;
+        _phase = _Phase.loadError;
+      });
       return;
     }
-    setState(() => _phase = _Phase.loading);
+    setState(() {
+      _failure = null;
+      _phase = _Phase.loading;
+    });
     try {
       final overview = await _repo.overview(accessToken: token);
       if (!mounted) return;
@@ -102,8 +112,13 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
         _blockers = overview.blockers;
         _phase = _Phase.form;
       });
-    } catch (_) {
-      if (mounted) setState(() => _phase = _Phase.loadError);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _failure = e;
+          _phase = _Phase.loadError;
+        });
+      }
     }
   }
 
@@ -241,7 +256,7 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
         }
       },
       child: Scaffold(
-        backgroundColor: DealGoColors.card,
+        backgroundColor: DealGoColors.canvas,
         appBar: DealGoAppHeader(
           applySafeArea: true,
           title: l10n.deleteAccountHeader,
@@ -256,8 +271,13 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
         body: SafeArea(
           top: false,
           child: switch (_phase) {
-            _Phase.loading => const Center(child: CircularProgressIndicator()),
-            _Phase.loadError => _LoadError(onRetry: _load),
+            _Phase.loading => const _DeleteAccountSkeleton(),
+            _Phase.loadError => DealGoStateView.failure(
+              context,
+              onRetry: _load,
+              cause: _failure,
+              message: l10n.deleteAccountLoadError,
+            ),
             _Phase.form => _buildForm(context),
             _Phase.verify => _buildVerify(context),
             _Phase.done => _buildDone(context),
@@ -284,13 +304,6 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
               DealGoSpacing.s16,
             ),
             children: [
-              Text(
-                l10n.deleteAccountTitle,
-                style: textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: DealGoSpacing.s16),
               _WarningBox(
                 title: l10n.deleteAccountWarnTitle,
                 body: l10n.deleteAccountWarnBody,
@@ -548,30 +561,6 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _LoadError extends StatelessWidget {
-  const _LoadError({required this.onRetry});
-
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(l10n.deleteAccountLoadError, textAlign: TextAlign.center),
-            const SizedBox(height: DealGoSpacing.s12),
-            DealGoSecondaryButton(label: l10n.actionRetry, onPressed: onRetry),
-          ],
-        ),
       ),
     );
   }
@@ -838,6 +827,147 @@ class _DangerButton extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
+      ),
+    );
+  }
+}
+
+class _DeleteAccountSkeleton extends StatelessWidget {
+  const _DeleteAccountSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return DealGoShimmer(
+      child: Column(
+        children: [
+          Expanded(
+            child: ListView(
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                DealGoDimensions.pageGutter,
+                DealGoSpacing.s8,
+                DealGoDimensions.pageGutter,
+                DealGoSpacing.s16,
+              ),
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(DealGoSpacing.s16),
+                  decoration: BoxDecoration(
+                    color: DealGoColors.card,
+                    borderRadius: BorderRadius.circular(DealGoRadius.card),
+                    border: Border.all(color: DealGoColors.border),
+                  ),
+                  child: const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      DealGoSkeletonBox(height: 16, width: 140),
+                      SizedBox(height: DealGoSpacing.s8),
+                      DealGoSkeletonBox(height: 12),
+                      SizedBox(height: DealGoSpacing.s4),
+                      DealGoSkeletonBox(height: 12, width: 220),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: DealGoSpacing.s20),
+                const FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: 0.45,
+                  child: DealGoSkeletonBox(height: 16),
+                ),
+                const SizedBox(height: DealGoSpacing.s12),
+                Container(
+                  decoration: BoxDecoration(
+                    color: DealGoColors.card,
+                    borderRadius: BorderRadius.circular(DealGoRadius.card),
+                    border: Border.all(color: DealGoColors.border),
+                  ),
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < 3; i++) ...[
+                        if (i > 0)
+                          Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: DealGoColors.border,
+                          ),
+                        const Padding(
+                          padding: EdgeInsets.all(DealGoSpacing.s14),
+                          child: Row(
+                            children: [
+                              DealGoSkeletonBox(
+                                width: 36,
+                                height: 36,
+                                radius: DealGoRadius.small,
+                              ),
+                              SizedBox(width: DealGoSpacing.s12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    DealGoSkeletonBox(height: 14, width: 130),
+                                    SizedBox(height: DealGoSpacing.s6),
+                                    DealGoSkeletonBox(height: 12),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: DealGoSpacing.s20),
+                const FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: 0.35,
+                  child: DealGoSkeletonBox(height: 16),
+                ),
+                const SizedBox(height: DealGoSpacing.s12),
+                Container(
+                  padding: const EdgeInsets.all(DealGoSpacing.s14),
+                  decoration: BoxDecoration(
+                    color: DealGoColors.card,
+                    borderRadius: BorderRadius.circular(DealGoRadius.card),
+                    border: Border.all(color: DealGoColors.border),
+                  ),
+                  child: const Row(
+                    children: [
+                      DealGoSkeletonBox(
+                        width: 22,
+                        height: 22,
+                        radius: DealGoRadius.small,
+                      ),
+                      SizedBox(width: DealGoSpacing.s12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            DealGoSkeletonBox(height: 14, width: 150),
+                            SizedBox(height: DealGoSpacing.s4),
+                            DealGoSkeletonBox(height: 12),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(
+              DealGoDimensions.pageGutter,
+              DealGoSpacing.s8,
+              DealGoDimensions.pageGutter,
+              DealGoSpacing.s16,
+            ),
+            child: DealGoSkeletonBox(
+              height: DealGoDimensions.buttonMinHeight,
+              radius: DealGoRadius.button,
+            ),
+          ),
+        ],
       ),
     );
   }

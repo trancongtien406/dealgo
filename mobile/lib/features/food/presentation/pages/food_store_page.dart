@@ -14,6 +14,7 @@ import '../../../../core/maps/map_port.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/design_system/components/dealgo_banner.dart';
 import '../../../../core/design_system/components/dealgo_nav_insets.dart';
+import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/motion/dealgo_sheet.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_voucher_ticket.dart';
@@ -84,7 +85,7 @@ class _FoodStoreView extends StatefulWidget {
 
 /// Pinned bar geometry: tabs always, then the in-store search.
 const double _tabsHeight = 46;
-const double _searchHeight = 54;
+const double _searchHeight = 64;
 
 /// Side of a menu row's square photo.
 const double _menuImageWidth = 96;
@@ -481,11 +482,9 @@ class _FoodStorePageState extends State<_FoodStoreView> {
                     SizedBox(
                       height: _searchHeight,
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          DealGoDimensions.pageGutter,
-                          DealGoSpacing.s4,
-                          DealGoDimensions.pageGutter,
-                          DealGoSpacing.s6,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: DealGoDimensions.pageGutter,
+                          vertical: DealGoSpacing.s6,
                         ),
                         child: _MenuSearchBar(controller: _query),
                       ),

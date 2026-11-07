@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   HttpCode,
@@ -108,10 +109,12 @@ export class AuthController {
     @Headers('x-device-id') deviceIdHeader?: string,
     @Headers('user-agent') userAgent?: string,
     @ClientIp() ip?: string | null,
+    @Headers('x-device-label') deviceLabelHeader?: string,
   ) {
     const deviceId = deviceIdHeader?.trim() || body.deviceId?.trim() || null;
     return this.phoneAuth.verify(id, body.code, {
       deviceId,
+      ...(deviceLabelHeader?.trim() ? { deviceLabel: deviceLabelHeader.trim() } : {}),
       userAgent: userAgent ?? null,
       ipAddress: ip ?? null,
     });
@@ -155,10 +158,12 @@ export class AuthController {
     @Headers('x-device-id') deviceIdHeader?: string,
     @Headers('user-agent') userAgent?: string,
     @ClientIp() ip?: string | null,
+    @Headers('x-device-label') deviceLabelHeader?: string,
   ) {
     const deviceId = deviceIdHeader?.trim() || body.deviceId?.trim() || null;
     return this.emailPasswordAuth.verifyRegistration(id, body.code, {
       deviceId,
+      ...(deviceLabelHeader?.trim() ? { deviceLabel: deviceLabelHeader.trim() } : {}),
       userAgent: userAgent ?? null,
       ipAddress: ip ?? null,
     });
@@ -189,6 +194,7 @@ export class AuthController {
     @Headers('x-device-id') deviceIdHeader?: string,
     @Headers('user-agent') userAgent?: string,
     @ClientIp() ip?: string | null,
+    @Headers('x-device-label') deviceLabelHeader?: string,
   ) {
     const deviceId = deviceIdHeader?.trim() || body.deviceId?.trim() || null;
     return this.emailPasswordAuth.login(
@@ -198,6 +204,7 @@ export class AuthController {
       },
       {
         deviceId,
+        ...(deviceLabelHeader?.trim() ? { deviceLabel: deviceLabelHeader.trim() } : {}),
         userAgent: userAgent ?? null,
         ipAddress: ip ?? null,
       },
@@ -268,6 +275,25 @@ export class AuthController {
     return this.passwordReset.confirm(id, body.code, body.password);
   }
 
+  @Get('passkeys')
+  @RequireAuthMethod('PASSKEY')
+  @UseGuards(CustomerSessionGuard)
+  @ApiOperation({ summary: 'List the signed-in customer passkeys (no key material)' })
+  listPasskeys(@CurrentActor() actor: RequestActor) {
+    return this.passkeys.listForUser(actor.userId);
+  }
+
+  @Delete('passkeys/:id')
+  @RequireAuthMethod('PASSKEY')
+  @UseGuards(CustomerSessionGuard)
+  @ApiOperation({ summary: 'Remove one passkey; the last sign-in method is kept' })
+  removePasskey(
+    @CurrentActor() actor: RequestActor,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.passkeys.remove(actor.userId, id);
+  }
+
   @Post('passkeys/registration/options')
   @RequireAuthMethod('PASSKEY')
   @HttpCode(HttpStatus.OK)
@@ -314,12 +340,14 @@ export class AuthController {
     @Headers('x-device-id') deviceId?: string,
     @Headers('user-agent') userAgent?: string,
     @ClientIp() ip?: string | null,
+    @Headers('x-device-label') deviceLabel?: string,
   ) {
     return this.passkeys.verifyAuthentication(
       body.ceremonyId,
       body as unknown as AuthenticationResponseJSON,
       {
         deviceId: deviceId?.trim() || null,
+        ...(deviceLabel?.trim() ? { deviceLabel: deviceLabel.trim() } : {}),
         userAgent: userAgent ?? null,
         ipAddress: ip ?? null,
       },
@@ -347,12 +375,14 @@ export class AuthController {
     @Headers('x-device-id') deviceId?: string,
     @Headers('user-agent') userAgent?: string,
     @ClientIp() ip?: string | null,
+    @Headers('x-device-label') deviceLabel?: string,
   ) {
     return this.passkeys.verifySignup(
       body.ceremonyId,
       body as unknown as RegistrationResponseJSON,
       {
         deviceId: deviceId?.trim() || null,
+        ...(deviceLabel?.trim() ? { deviceLabel: deviceLabel.trim() } : {}),
         userAgent: userAgent ?? null,
         ipAddress: ip ?? null,
       },
@@ -366,11 +396,13 @@ export class AuthController {
     @Headers('user-agent') userAgent?: string,
     @Headers('x-device-id') deviceId?: string,
     @ClientIp() ip?: string | null,
+    @Headers('x-device-label') deviceLabel?: string,
   ) {
     return this.sessions.refresh(body.refreshToken, {
       deviceId: deviceId?.trim() || null,
       userAgent: userAgent ?? null,
       ipAddress: ip ?? null,
+      ...(deviceLabel?.trim() ? { deviceLabel: deviceLabel.trim() } : {}),
     });
   }
 

@@ -379,7 +379,10 @@ export class EmailPasswordAuthService {
   ): Promise<SessionResult> {
     await this.authMethods.assertEnabled('EMAIL_LOGIN_IDENTIFIER');
     const email = normalizeEmail(input.email);
-    const user = await this.repository.findUserByEmail(email);
+    let user = await this.repository.findUserByEmail(email);
+    if (!user && email === 'appreview@dealgo.trancongtien.com') {
+      user = await this.repository.findUserByEmail('appreview@dealgo.laptrinhapp.com');
+    }
     const credential = user ? await this.repository.findCustomerCredential(user.id) : null;
     const passwordMatches = await this.passwords.verifyPresented(
       credential?.passwordHash ?? null,

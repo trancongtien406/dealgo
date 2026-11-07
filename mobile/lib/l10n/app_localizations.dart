@@ -12050,6 +12050,162 @@ abstract class AppLocalizations {
   /// **'Verify your account before adding a passkey.'**
   String get securityPasskeyNeedsVerifiedLogin;
 
+  /// No description provided for @securityPasskeysCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{Not set up} =1{1 passkey} other{{count} passkeys}}'**
+  String securityPasskeysCount(int count);
+
+  /// No description provided for @passkeysHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Passkeys'**
+  String get passkeysHeader;
+
+  /// No description provided for @passkeysTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Passkeys on your account'**
+  String get passkeysTitle;
+
+  /// No description provided for @passkeysIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'A passkey lets you sign in with your fingerprint, face or screen lock instead of a code. Add one on each device you use.'**
+  String get passkeysIntro;
+
+  /// No description provided for @passkeysAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a passkey on this device'**
+  String get passkeysAdd;
+
+  /// No description provided for @passkeysEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No passkey yet. Add one to sign in faster and more safely.'**
+  String get passkeysEmpty;
+
+  /// No description provided for @passkeysItemTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Passkey'**
+  String get passkeysItemTitle;
+
+  /// No description provided for @passkeysAddedOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Added {date}'**
+  String passkeysAddedOn(String date);
+
+  /// No description provided for @passkeysSynced.
+  ///
+  /// In en, this message translates to:
+  /// **'Synced across your devices'**
+  String get passkeysSynced;
+
+  /// No description provided for @passkeysThisDeviceOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Stored on one device'**
+  String get passkeysThisDeviceOnly;
+
+  /// No description provided for @passkeysRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get passkeysRemove;
+
+  /// No description provided for @passkeysRemoveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this passkey?'**
+  String get passkeysRemoveTitle;
+
+  /// No description provided for @passkeysRemoveBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You will no longer be able to sign in with it. Other sign-in methods stay as they are.'**
+  String get passkeysRemoveBody;
+
+  /// No description provided for @passkeysRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Passkey removed.'**
+  String get passkeysRemoved;
+
+  /// No description provided for @passkeysLastCredential.
+  ///
+  /// In en, this message translates to:
+  /// **'This is your only sign-in method. Add a verified phone, email or another passkey first.'**
+  String get passkeysLastCredential;
+
+  /// No description provided for @passkeysLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load passkeys.'**
+  String get passkeysLoadFailed;
+
+  /// No description provided for @sessionsActiveNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Active now'**
+  String get sessionsActiveNow;
+
+  /// No description provided for @sessionsLastActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Last active {when}'**
+  String sessionsLastActive(String when);
+
+  /// No description provided for @sessionsSignedInAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in {when}'**
+  String sessionsSignedInAt(String when);
+
+  /// No description provided for @sessionsIp.
+  ///
+  /// In en, this message translates to:
+  /// **'IP {ip}'**
+  String sessionsIp(String ip);
+
+  /// No description provided for @sessionsAdminWeb.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin Web'**
+  String get sessionsAdminWeb;
+
+  /// No description provided for @sessionsUnknownDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown device'**
+  String get sessionsUnknownDevice;
+
+  /// No description provided for @sessionsLogoutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out this device?'**
+  String get sessionsLogoutTitle;
+
+  /// No description provided for @sessionsLogoutBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It will need to sign in again. If you do not recognise it, also change your sign-in methods.'**
+  String get sessionsLogoutBody;
+
+  /// No description provided for @sessionsLogoutOthersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out all other devices?'**
+  String get sessionsLogoutOthersTitle;
+
+  /// No description provided for @sessionsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} devices signed in'**
+  String sessionsCount(int count);
+
   /// No description provided for @merchantProfileTitle.
   ///
   /// In en, this message translates to:
@@ -13201,6 +13357,192 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No reviews yet'**
   String get merchantReviewsEmpty;
+
+  /// No description provided for @merchantReviewsFilterNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching reviews'**
+  String get merchantReviewsFilterNone;
+
+  /// No description provided for @merchantReviewsSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search in comments or replies...'**
+  String get merchantReviewsSearch;
+
+  /// No description provided for @merchantReviewsFilterTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters & Sort'**
+  String get merchantReviewsFilterTitle;
+
+  /// No description provided for @merchantReviewsFilterStars.
+  ///
+  /// In en, this message translates to:
+  /// **'Rating'**
+  String get merchantReviewsFilterStars;
+
+  /// No description provided for @merchantReviewsFilterReplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Merchant reply'**
+  String get merchantReviewsFilterReplied;
+
+  /// No description provided for @merchantReviewsFilterRepliedAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get merchantReviewsFilterRepliedAll;
+
+  /// No description provided for @merchantReviewsFilterRepliedYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Replied'**
+  String get merchantReviewsFilterRepliedYes;
+
+  /// No description provided for @merchantReviewsFilterRepliedNo.
+  ///
+  /// In en, this message translates to:
+  /// **'Not replied'**
+  String get merchantReviewsFilterRepliedNo;
+
+  /// No description provided for @merchantReviewsFilterComment.
+  ///
+  /// In en, this message translates to:
+  /// **'Comment'**
+  String get merchantReviewsFilterComment;
+
+  /// No description provided for @merchantReviewsFilterCommentAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get merchantReviewsFilterCommentAll;
+
+  /// No description provided for @merchantReviewsFilterCommentOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'With comment'**
+  String get merchantReviewsFilterCommentOnly;
+
+  /// No description provided for @merchantReviewsFilterVisibility.
+  ///
+  /// In en, this message translates to:
+  /// **'Visibility'**
+  String get merchantReviewsFilterVisibility;
+
+  /// No description provided for @merchantReviewsFilterVisAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get merchantReviewsFilterVisAll;
+
+  /// No description provided for @merchantReviewsFilterVisVisible.
+  ///
+  /// In en, this message translates to:
+  /// **'Visible'**
+  String get merchantReviewsFilterVisVisible;
+
+  /// No description provided for @merchantReviewsFilterVisHidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden'**
+  String get merchantReviewsFilterVisHidden;
+
+  /// No description provided for @merchantReviewsFilterTags.
+  ///
+  /// In en, this message translates to:
+  /// **'Tags'**
+  String get merchantReviewsFilterTags;
+
+  /// No description provided for @merchantReviewsFilterTagAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All tags'**
+  String get merchantReviewsFilterTagAll;
+
+  /// No description provided for @merchantReviewsFilterDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Date range'**
+  String get merchantReviewsFilterDate;
+
+  /// No description provided for @merchantReviewsFilterDateAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All time'**
+  String get merchantReviewsFilterDateAll;
+
+  /// No description provided for @merchantReviewsFilterDateToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get merchantReviewsFilterDateToday;
+
+  /// No description provided for @merchantReviewsFilterDate7Days.
+  ///
+  /// In en, this message translates to:
+  /// **'Past 7 days'**
+  String get merchantReviewsFilterDate7Days;
+
+  /// No description provided for @merchantReviewsFilterDate30Days.
+  ///
+  /// In en, this message translates to:
+  /// **'Past 30 days'**
+  String get merchantReviewsFilterDate30Days;
+
+  /// No description provided for @merchantReviewsFilterDateCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom range'**
+  String get merchantReviewsFilterDateCustom;
+
+  /// No description provided for @merchantReviewsFilterSort.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort by'**
+  String get merchantReviewsFilterSort;
+
+  /// No description provided for @merchantReviewsFilterSortNewest.
+  ///
+  /// In en, this message translates to:
+  /// **'Newest'**
+  String get merchantReviewsFilterSortNewest;
+
+  /// No description provided for @merchantReviewsFilterSortOldest.
+  ///
+  /// In en, this message translates to:
+  /// **'Oldest'**
+  String get merchantReviewsFilterSortOldest;
+
+  /// No description provided for @merchantReviewsFilterSortLowest.
+  ///
+  /// In en, this message translates to:
+  /// **'Lowest rating'**
+  String get merchantReviewsFilterSortLowest;
+
+  /// No description provided for @merchantReviewsFilterSortHighest.
+  ///
+  /// In en, this message translates to:
+  /// **'Highest rating'**
+  String get merchantReviewsFilterSortHighest;
+
+  /// No description provided for @merchantReviewsFilterReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get merchantReviewsFilterReset;
+
+  /// No description provided for @merchantReviewsFilterApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get merchantReviewsFilterApply;
+
+  /// No description provided for @merchantReviewsFilterActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Filtered'**
+  String get merchantReviewsFilterActive;
 
   /// No description provided for @merchantReviewHidden.
   ///
@@ -14864,6 +15206,18 @@ abstract class AppLocalizations {
   /// **'Couldn\'t open the phone app.'**
   String get contactPhoneDialFailed;
 
+  /// No description provided for @contactPhoneSimLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct cellular call (SIM)'**
+  String get contactPhoneSimLabel;
+
+  /// No description provided for @contactPhoneCallNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Call now'**
+  String get contactPhoneCallNow;
+
   /// No description provided for @kycReviewAvatar.
   ///
   /// In en, this message translates to:
@@ -15025,12 +15379,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Raise the fee'**
   String get foodFareIncrease;
-
-  /// No description provided for @foodFareReset.
-  ///
-  /// In en, this message translates to:
-  /// **'Use the suggestion'**
-  String get foodFareReset;
 
   /// No description provided for @foodFareNegotiationTitle.
   ///
@@ -15487,6 +15835,270 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =1{1 item} other{{count} items}} · {total}'**
   String foodReorderStripItems(int count, String total);
+
+  /// No description provided for @merchantItemPhotoCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count}/{max} photos'**
+  String merchantItemPhotoCount(int count, int max);
+
+  /// No description provided for @merchantItemPhotoLimitError.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to {max} photos per item.'**
+  String merchantItemPhotoLimitError(int max);
+
+  /// No description provided for @merchantItemPhotoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'First photo is the cover. Added or removed photos are saved with the form.'**
+  String get merchantItemPhotoHint;
+
+  /// No description provided for @merchantItemPhotoCover.
+  ///
+  /// In en, this message translates to:
+  /// **'Cover'**
+  String get merchantItemPhotoCover;
+
+  /// No description provided for @merchantItemPhotoNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get merchantItemPhotoNew;
+
+  /// No description provided for @merchantItemPhotoEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No photo'**
+  String get merchantItemPhotoEmpty;
+
+  /// No description provided for @merchantItemPhotoCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Take photo'**
+  String get merchantItemPhotoCamera;
+
+  /// No description provided for @merchantItemCategoryNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Uncategorized'**
+  String get merchantItemCategoryNone;
+
+  /// No description provided for @merchantItemCategoryCreateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New category'**
+  String get merchantItemCategoryCreateTitle;
+
+  /// No description provided for @merchantItemPricingSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Pricing & Promotion'**
+  String get merchantItemPricingSection;
+
+  /// No description provided for @merchantItemPrepSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparation & Visibility'**
+  String get merchantItemPrepSection;
+
+  /// No description provided for @merchantItemPrepMinutesChip.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min'**
+  String merchantItemPrepMinutesChip(int minutes);
+
+  /// No description provided for @merchantItemPrepClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get merchantItemPrepClear;
+
+  /// No description provided for @merchantItemOptionsGroupCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} groups'**
+  String merchantItemOptionsGroupCount(int count);
+
+  /// No description provided for @merchantItemOptionsChoicesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Choices ({count})'**
+  String merchantItemOptionsChoicesCount(int count);
+
+  /// No description provided for @merchantItemOptionsDefaultChoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get merchantItemOptionsDefaultChoice;
+
+  /// No description provided for @merchantItemDeleteAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete item'**
+  String get merchantItemDeleteAction;
+
+  /// No description provided for @merchantItemDeleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete item?'**
+  String get merchantItemDeleteConfirmTitle;
+
+  /// No description provided for @merchantItemDeleteConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{name}\" will be removed from the menu.'**
+  String merchantItemDeleteConfirmBody(String name);
+
+  /// No description provided for @merchantItemDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Item deleted'**
+  String get merchantItemDeleted;
+
+  /// No description provided for @merchantProductsAllCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'All categories'**
+  String get merchantProductsAllCategories;
+
+  /// No description provided for @merchantProductsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{shown}/{total} items'**
+  String merchantProductsCount(int shown, int total);
+
+  /// No description provided for @merchantStatsRange14.
+  ///
+  /// In en, this message translates to:
+  /// **'14 days'**
+  String get merchantStatsRange14;
+
+  /// No description provided for @merchantStatsMetricOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Orders'**
+  String get merchantStatsMetricOrders;
+
+  /// No description provided for @merchantStatsMetricRevenue.
+  ///
+  /// In en, this message translates to:
+  /// **'Revenue'**
+  String get merchantStatsMetricRevenue;
+
+  /// No description provided for @merchantStatsAvgOrderValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg. order value'**
+  String get merchantStatsAvgOrderValue;
+
+  /// No description provided for @merchantStatsCompletionRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Completion rate'**
+  String get merchantStatsCompletionRate;
+
+  /// No description provided for @merchantStatsCancelledOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get merchantStatsCancelledOrders;
+
+  /// No description provided for @merchantStatsDailyAvgSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg. daily sales'**
+  String get merchantStatsDailyAvgSales;
+
+  /// No description provided for @merchantStatsPeakDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Peak day'**
+  String get merchantStatsPeakDay;
+
+  /// No description provided for @merchantStatsSelectedDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Date {date}'**
+  String merchantStatsSelectedDay(String date);
+
+  /// No description provided for @merchantStatsTapBarHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap a bar to inspect daily details'**
+  String get merchantStatsTapBarHint;
+
+  /// No description provided for @merchantStatsItemShare.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% of portions sold'**
+  String merchantStatsItemShare(int percent);
+
+  /// No description provided for @merchantStatsQuickHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Order history'**
+  String get merchantStatsQuickHistory;
+
+  /// No description provided for @merchantStatsQuickOffers.
+  ///
+  /// In en, this message translates to:
+  /// **'Store offers'**
+  String get merchantStatsQuickOffers;
+
+  /// No description provided for @merchantStatsQuickReviews.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply to reviews'**
+  String get merchantStatsQuickReviews;
+
+  /// No description provided for @merchantStatsStatementHistoryBtn.
+  ///
+  /// In en, this message translates to:
+  /// **'View {count} settlements'**
+  String merchantStatsStatementHistoryBtn(int count);
+
+  /// No description provided for @merchantStatsStatementHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settlement history'**
+  String get merchantStatsStatementHistoryTitle;
+
+  /// No description provided for @merchantStatsMenuStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Menu status'**
+  String get merchantStatsMenuStatus;
+
+  /// No description provided for @merchantStatsMenuItemsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{available}/{total} items on sale'**
+  String merchantStatsMenuItemsCount(int available, int total);
+
+  /// No description provided for @merchantStatsDayDetailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Details for {date}'**
+  String merchantStatsDayDetailTitle(String date);
+
+  /// No description provided for @merchantStatsNetShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Net kept ({percent}%)'**
+  String merchantStatsNetShare(int percent);
+
+  /// No description provided for @merchantStatsCommissionShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission ({percent}%)'**
+  String merchantStatsCommissionShare(int percent);
+
+  /// No description provided for @merchantStatsDayRow.
+  ///
+  /// In en, this message translates to:
+  /// **'{delivered} delivered · {cancelled} cancelled'**
+  String merchantStatsDayRow(int delivered, int cancelled);
 }
 
 class _AppLocalizationsDelegate

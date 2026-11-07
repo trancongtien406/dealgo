@@ -293,8 +293,7 @@ class FoodDiscoveryCubit extends Cubit<FoodDiscoveryState> {
     }
     final missingIds = [
       for (final store in current.stores)
-        if (store.ratingCount == null &&
-            !current.ratings.containsKey(store.id))
+        if (store.ratingCount == null && !current.ratings.containsKey(store.id))
           store.id,
     ];
     if (missingIds.isEmpty) {

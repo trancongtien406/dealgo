@@ -26,6 +26,7 @@ class InboxUnread extends ChangeNotifier {
   StreamSubscription<void>? _inboxSub;
   StreamSubscription<void>? _reconnectSub;
   DateTime? _fetchedAt;
+  Future<void>? _refreshFlight;
 
   int get count => _count;
 
@@ -57,7 +58,12 @@ class InboxUnread extends ChangeNotifier {
 
   static const _minRefresh = Duration(seconds: 30);
 
-  Future<void> refresh() async {
+  Future<void> refresh() {
+    return _refreshFlight ??=
+        _performRefresh().whenComplete(() => _refreshFlight = null);
+  }
+
+  Future<void> _performRefresh() async {
     final fetch = _fetch;
     if (fetch == null) {
       return;
@@ -111,6 +117,7 @@ class InboxUnread extends ChangeNotifier {
     _fetch = null;
     _userId = null;
     _fetchedAt = null;
+    _refreshFlight = null;
     _count = 0;
   }
 }

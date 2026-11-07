@@ -86,11 +86,33 @@ class DioRatingRemoteDataSource implements RatingRepository {
   Future<MerchantReviews> merchantReviews({
     required String accessToken,
     int page = 1,
+    int? stars,
+    MerchantReviewReplyFilter replied = MerchantReviewReplyFilter.all,
+    bool? hasComment,
+    MerchantReviewVisibilityFilter visibility =
+        MerchantReviewVisibilityFilter.all,
+    RatingTag? tag,
+    String? q,
+    DateTime? from,
+    DateTime? to,
+    MerchantReviewSort sort = MerchantReviewSort.newest,
   }) async {
     try {
+      final queryParams = <String, dynamic>{
+        if (page > 1) 'page': page,
+        'stars': ?stars,
+        'replied': ?replied.wire,
+        'hasComment': ?hasComment,
+        'visibility': ?visibility.wire,
+        'tag': ?tag?.wire,
+        if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
+        'from': ?from?.toIso8601String(),
+        'to': ?to?.toIso8601String(),
+        if (sort != MerchantReviewSort.newest) 'sort': sort.wire,
+      };
       final response = await dio.get<Object?>(
         ApiPaths.foodMerchantReviews,
-        queryParameters: {if (page > 1) 'page': page},
+        queryParameters: queryParams,
         options: _auth(accessToken),
       );
       final data = requireSuccessData(response.data);
@@ -261,6 +283,18 @@ ServiceRating? decodeServiceRating(Object? raw) {
   );
 }
 
+String _foldText(String value) {
+  return value
+      .toLowerCase()
+      .replaceAll(RegExp(r'[àáạảãâầấậẩẫăằắặẳẵ]'), 'a')
+      .replaceAll(RegExp(r'[èéẹẻẽêềếệểễ]'), 'e')
+      .replaceAll(RegExp(r'[ìíịỉĩ]'), 'i')
+      .replaceAll(RegExp(r'[òóọỏõôồốộổỗơờớợởỡ]'), 'o')
+      .replaceAll(RegExp(r'[ùúụủũưừứựửữ]'), 'u')
+      .replaceAll(RegExp(r'[ỳýỵỷỹ]'), 'y')
+      .replaceAll('đ', 'd');
+}
+
 /// In-memory ratings for tests, screenshots and mock builds.
 class FakeRatingRemoteDataSource implements RatingRepository {
   FakeRatingRemoteDataSource({
@@ -331,12 +365,93 @@ class FakeRatingRemoteDataSource implements RatingRepository {
   Future<MerchantReviews> merchantReviews({
     required String accessToken,
     int page = 1,
+    int? stars,
+    MerchantReviewReplyFilter replied = MerchantReviewReplyFilter.all,
+    bool? hasComment,
+    MerchantReviewVisibilityFilter visibility =
+        MerchantReviewVisibilityFilter.all,
+    RatingTag? tag,
+    String? q,
+    DateTime? from,
+    DateTime? to,
+    MerchantReviewSort sort = MerchantReviewSort.newest,
   }) async {
-    final all = reviews[merchantStoreId] ?? const <StoreReview>[];
+    var all = List<StoreReview>.from(
+      reviews[merchantStoreId] ?? const <StoreReview>[],
+    );
+    if (stars != null) {
+      all = all.where((r) => r.stars == stars).toList();
+    }
+    if (replied == MerchantReviewReplyFilter.replied) {
+      all = all
+          .where((r) => r.merchantReply != null && r.merchantReply!.trim().isNotEmpty)
+          .toList();
+    } else if (replied == MerchantReviewReplyFilter.unreplied) {
+      all = all
+          .where((r) => r.merchantReply == null || r.merchantReply!.trim().isEmpty)
+          .toList();
+    }
+    if (hasComment == true) {
+      all = all
+          .where((r) => r.comment != null && r.comment!.trim().isNotEmpty)
+          .toList();
+    } else if (hasComment == false) {
+      all = all
+          .where((r) => r.comment == null || r.comment!.trim().isEmpty)
+          .toList();
+    }
+    if (visibility == MerchantReviewVisibilityFilter.visible) {
+      all = all.where((r) => !r.hidden).toList();
+    } else if (visibility == MerchantReviewVisibilityFilter.hidden) {
+      all = all.where((r) => r.hidden).toList();
+    }
+    if (tag != null) {
+      all = all.where((r) => r.tags.contains(tag)).toList();
+    }
+    if (q != null && q.trim().isNotEmpty) {
+      final needle = _foldText(q.trim());
+      all = all
+          .where(
+            (r) =>
+                (r.comment != null && _foldText(r.comment!).contains(needle)) ||
+                (r.merchantReply != null &&
+                    _foldText(r.merchantReply!).contains(needle)),
+          )
+          .toList();
+    }
+    if (from != null) {
+      all = all
+          .where((r) => r.createdAt.isAfter(from) || r.createdAt.isAtSameMomentAs(from))
+          .toList();
+    }
+    if (to != null) {
+      all = all
+          .where((r) => r.createdAt.isBefore(to) || r.createdAt.isAtSameMomentAs(to))
+          .toList();
+    }
+    switch (sort) {
+      case MerchantReviewSort.newest:
+        all.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      case MerchantReviewSort.oldest:
+        all.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      case MerchantReviewSort.lowestStars:
+        all.sort((a, b) {
+          final cmp = a.stars.compareTo(b.stars);
+          return cmp != 0 ? cmp : b.createdAt.compareTo(a.createdAt);
+        });
+      case MerchantReviewSort.highestStars:
+        all.sort((a, b) {
+          final cmp = b.stars.compareTo(a.stars);
+          return cmp != 0 ? cmp : b.createdAt.compareTo(a.createdAt);
+        });
+    }
     return MerchantReviews(
       summary:
           stores[merchantStoreId] ??
-          StoreRating(storeId: merchantStoreId, count: all.length),
+          StoreRating(
+            storeId: merchantStoreId,
+            count: (reviews[merchantStoreId] ?? const <StoreReview>[]).length,
+          ),
       items: all.skip((page - 1) * 20).take(20).toList(growable: false),
       total: all.length,
       page: page,

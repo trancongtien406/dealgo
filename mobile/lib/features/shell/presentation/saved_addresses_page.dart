@@ -163,6 +163,7 @@ class _SavedAddressesView extends StatelessWidget {
               key: const Key('address-add'),
               label: l10n.addrBookAdd,
               leadingIcon: DealGoIcons.add,
+              fullWidth: true,
               enabled: state is SavedAddressesLoaded && !full,
               onPressed: () => _openForm(context),
             ),
@@ -192,45 +193,39 @@ class _SavedAddressesView extends StatelessWidget {
       ),
       SavedAddressesFailed(:final cause) => DealGoRefresh(
         onRefresh: cubit.load,
-        child: ListView(
-          padding: padding,
-          children: [
-            DealGoStateView.failure(
-              context,
-              onRetry: cubit.load,
-              cause: cause,
-              compact: true,
-            ),
-          ],
+        child: DealGoStateView.failure(
+          context,
+          onRetry: cubit.load,
+          cause: cause,
         ),
       ),
-      SavedAddressesLoaded(:final items) => DealGoRefresh(
-        onRefresh: cubit.load,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: padding,
-          children: [
-            if (items.isEmpty)
-              DealGoStateView(
+      SavedAddressesLoaded(:final items) => items.isEmpty
+          ? DealGoRefresh(
+              onRefresh: cubit.load,
+              child: DealGoStateView(
                 art: DealGoStateArt.noAddresses,
                 title: l10n.addrBookEmptyTitle,
                 message: l10n.addrBookEmptyBody,
-                compact: true,
-              )
-            else ...[
-              for (final address in items) ...[
-                _AddressCard(
-                  address: address,
-                  onEdit: () => _openForm(context, editing: address),
-                  onDelete: () => _confirmDelete(context, address),
-                  onMakeDefault: () => _makeDefault(context, address),
-                ),
-                const SizedBox(height: DealGoSpacing.s12),
-              ],
-            ],
-          ],
-        ),
-      ),
+              ),
+            )
+          : DealGoRefresh(
+              onRefresh: cubit.load,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: padding,
+                children: [
+                  for (final address in items) ...[
+                    _AddressCard(
+                      address: address,
+                      onEdit: () => _openForm(context, editing: address),
+                      onDelete: () => _confirmDelete(context, address),
+                      onMakeDefault: () => _makeDefault(context, address),
+                    ),
+                    const SizedBox(height: DealGoSpacing.s12),
+                  ],
+                ],
+              ),
+            ),
     };
   }
 }

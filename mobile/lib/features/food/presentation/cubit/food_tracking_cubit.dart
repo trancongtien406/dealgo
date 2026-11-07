@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/network/api_exception.dart';
 import '../../../../core/network/request_failure.dart';
 import '../../../active_job/presentation/active_job_cache.dart';
 import '../utils/food_offline_snapshot.dart';
@@ -50,14 +51,25 @@ final class FoodTrackingOffline extends FoodTrackingState {
   final Object? cause;
 }
 
+/// The route points at an order that no longer exists for this customer.
+final class FoodTrackingMissing extends FoodTrackingState {
+  const FoodTrackingMissing();
+
+  @override
+  FoodOrderDetail? get order => null;
+
+  @override
+  bool get busy => false;
+}
+
 class FoodTrackingCubit extends Cubit<FoodTrackingState> {
   FoodTrackingCubit({
-    required this._getFoodOrder,
+    required this.getFoodOrder,
     required this.realtime,
     this._offlineCache,
   }) : super(const FoodTrackingLoading());
 
-  final GetFoodOrder _getFoodOrder;
+  final GetFoodOrder getFoodOrder;
   final SnapshotRealtime realtime;
   final ActiveJobCache? _offlineCache;
 
@@ -73,6 +85,7 @@ class FoodTrackingCubit extends Cubit<FoodTrackingState> {
     _orderId = orderId;
     _accessToken = accessToken;
     await refresh();
+    if (state is FoodTrackingMissing) return;
     await _binding?.stop();
     final binding = SnapshotBinding(
       realtime: realtime,
@@ -108,7 +121,7 @@ class FoodTrackingCubit extends Cubit<FoodTrackingState> {
           : FoodTrackingReady(previous, busy: true),
     );
     try {
-      final order = await _getFoodOrder(
+      final order = await getFoodOrder(
         GetFoodOrderParams(accessToken: token, orderId: orderId),
       );
       if (isClosed) {
@@ -124,6 +137,13 @@ class FoodTrackingCubit extends Cubit<FoodTrackingState> {
       );
     } catch (error) {
       if (isClosed) {
+        return;
+      }
+      if (error is ApiException &&
+          error.statusCode == 404 &&
+          error.errorCode == 'FOOD_ORDER_NOT_FOUND') {
+        await _offlineCache?.clearIfMatches(orderId);
+        if (!isClosed) emit(const FoodTrackingMissing());
         return;
       }
       emit(FoodTrackingOffline(order: previous, cause: error));

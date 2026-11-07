@@ -5,9 +5,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../../core/design_system/components/dealgo_primary_button.dart';
+import '../../../../core/design_system/components/dealgo_secondary_button.dart';
 import '../../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../../core/design_system/tokens/dealgo_tokens.dart';
+import '../../../../core/motion/dealgo_sheet.dart';
 import '../../../../l10n/app_localizations.dart';
 import '../../../food/domain/entities/food_models.dart';
 import '../../../food/domain/entities/food_money.dart';
@@ -133,16 +135,6 @@ class _VariantsBody extends StatelessWidget {
         MerchantPanel(
           child: Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: DealGoColors.primaryLight,
-                  borderRadius: BorderRadius.circular(DealGoRadius.card),
-                ),
-                child: const Icon(DealGoIcons.tag, color: DealGoColors.primary),
-              ),
-              const SizedBox(width: DealGoSpacing.s12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -392,7 +384,7 @@ class _ChoiceRow extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: DealGoColors.primaryLight,
+                color: DealGoColors.subtlePurple,
                 borderRadius: BorderRadius.circular(DealGoSpacing.s8),
               ),
               child: Icon(
@@ -466,8 +458,9 @@ Future<_GroupEdit?> _showGroupDialog(
   BuildContext context, {
   FoodOptionGroup? group,
 }) {
-  return showDialog<_GroupEdit>(
+  return showDealGoSheet<_GroupEdit>(
     context: context,
+    isScrollControlled: true,
     builder: (context) => _GroupDialog(group: group),
   );
 }
@@ -476,8 +469,9 @@ Future<_ChoiceEdit?> _showChoiceDialog(
   BuildContext context, {
   FoodOptionChoice? choice,
 }) {
-  return showDialog<_ChoiceEdit>(
+  return showDealGoSheet<_ChoiceEdit>(
     context: context,
+    isScrollControlled: true,
     builder: (context) => _ChoiceDialog(choice: choice),
   );
 }
@@ -511,6 +505,7 @@ class _GroupDialogState extends State<_GroupDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
     final minSelect = int.tryParse(_min.text) ?? -1;
     final maxSelect = int.tryParse(_max.text) ?? -1;
     final ok =
@@ -521,61 +516,100 @@ class _GroupDialogState extends State<_GroupDialog> {
         minSelect <= maxSelect &&
         maxSelect <= merchantOptionMaxChoices;
     final digits = [FilteringTextInputFormatter.digitsOnly];
-    return AlertDialog(
-      title: Text(l10n.merchantOptionsGroupDialogTitle),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          DealGoTextField(
-            label: l10n.merchantOptionsGroupName,
-            fieldKey: const Key('merchant-group-name'),
-            controller: _name,
-            maxLength: 80,
-            onChanged: (_) => setState(() {}),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          DealGoDimensions.pageGutter,
+          DealGoSpacing.s20,
+          DealGoDimensions.pageGutter,
+          DealGoSpacing.s16 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.merchantOptionsGroupDialogTitle,
+                style: textTheme.titleMedium,
+              ),
+              const SizedBox(height: DealGoSpacing.s16),
+              DealGoTextField(
+                label: l10n.merchantOptionsGroupName,
+                fieldKey: const Key('merchant-group-name'),
+                controller: _name,
+                maxLength: 80,
+                textInputAction: TextInputAction.next,
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: DealGoSpacing.s12),
+              DealGoTextField(
+                label: l10n.merchantOptionsMin,
+                fieldKey: const Key('merchant-group-min'),
+                controller: _min,
+                keyboardType: TextInputType.number,
+                inputFormatters: digits,
+                textInputAction: TextInputAction.next,
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: DealGoSpacing.s12),
+              DealGoTextField(
+                label: l10n.merchantOptionsMax,
+                fieldKey: const Key('merchant-group-max'),
+                controller: _max,
+                keyboardType: TextInputType.number,
+                inputFormatters: digits,
+                textInputAction: TextInputAction.done,
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: DealGoSpacing.s20),
+              if (widget.group != null) ...[
+                DealGoSecondaryButton(
+                  key: const Key('merchant-group-delete'),
+                  label: l10n.merchantOptionsDelete,
+                  tone: DealGoSecondaryTone.danger,
+                  onPressed: () {
+                    FocusScope.of(context).unfocus();
+                    Navigator.of(
+                      context,
+                    ).pop(const _GroupEdit('', 0, 1, delete: true));
+                  },
+                ),
+                const SizedBox(height: DealGoSpacing.s8),
+              ],
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: DealGoSecondaryButton(
+                        label: l10n.actionCancel,
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ),
+                    const SizedBox(width: DealGoSpacing.s12),
+                    Expanded(
+                      child: DealGoPrimaryButton(
+                        key: const Key('merchant-group-apply'),
+                        label: l10n.merchantOptionsApply,
+                        enabled: ok,
+                        onPressed: () {
+                          if (!ok) return;
+                          FocusScope.of(context).unfocus();
+                          Navigator.of(context).pop(
+                            _GroupEdit(_name.text.trim(), minSelect, maxSelect),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          DealGoTextField(
-            label: l10n.merchantOptionsMin,
-            fieldKey: const Key('merchant-group-min'),
-            controller: _min,
-            keyboardType: TextInputType.number,
-            inputFormatters: digits,
-            onChanged: (_) => setState(() {}),
-          ),
-          DealGoTextField(
-            label: l10n.merchantOptionsMax,
-            fieldKey: const Key('merchant-group-max'),
-            controller: _max,
-            keyboardType: TextInputType.number,
-            inputFormatters: digits,
-            onChanged: (_) => setState(() {}),
-          ),
-        ],
+        ),
       ),
-      actions: [
-        if (widget.group != null)
-          TextButton(
-            key: const Key('merchant-group-delete'),
-            onPressed: () =>
-                Navigator.of(context)
-                    .pop(const _GroupEdit('', 0, 1, delete: true)),
-            child: Text(
-              l10n.merchantOptionsDelete,
-              style: const TextStyle(color: DealGoColors.danger),
-            ),
-          ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(l10n.actionCancel),
-        ),
-        FilledButton(
-          key: const Key('merchant-group-apply'),
-          onPressed: ok
-              ? () => Navigator.of(context)
-                    .pop(_GroupEdit(_name.text.trim(), minSelect, maxSelect))
-              : null,
-          child: Text(l10n.merchantOptionsApply),
-        ),
-      ],
     );
   }
 }
@@ -610,6 +644,7 @@ class _ChoiceDialogState extends State<_ChoiceDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final textTheme = Theme.of(context).textTheme;
     final extra = int.tryParse(_price.text) ?? -1;
     final maxQ = int.tryParse(_maxQty.text) ?? 0;
     final ok =
@@ -619,74 +654,113 @@ class _ChoiceDialogState extends State<_ChoiceDialog> {
         extra <= merchantOptionMaxDeltaVnd &&
         maxQ >= 1 &&
         maxQ <= 99;
-    return AlertDialog(
-      title: Text(l10n.merchantOptionsChoiceDialogTitle),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          DealGoTextField(
-            label: l10n.merchantOptionsChoiceName,
-            fieldKey: const Key('merchant-option-name'),
-            controller: _name,
-            maxLength: 80,
-            onChanged: (_) => setState(() {}),
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          DealGoDimensions.pageGutter,
+          DealGoSpacing.s20,
+          DealGoDimensions.pageGutter,
+          DealGoSpacing.s16 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.merchantOptionsChoiceDialogTitle,
+                style: textTheme.titleMedium,
+              ),
+              const SizedBox(height: DealGoSpacing.s16),
+              DealGoTextField(
+                label: l10n.merchantOptionsChoiceName,
+                fieldKey: const Key('merchant-option-name'),
+                controller: _name,
+                maxLength: 80,
+                textInputAction: TextInputAction.next,
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: DealGoSpacing.s12),
+              DealGoTextField(
+                label: l10n.merchantOptionsChoicePrice,
+                fieldKey: const Key('merchant-option-price'),
+                controller: _price,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                textInputAction: TextInputAction.next,
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: DealGoSpacing.s12),
+              DealGoTextField(
+                label: l10n.merchantOptionsChoiceMaxQty,
+                fieldKey: const Key('merchant-option-max-qty'),
+                controller: _maxQty,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                textInputAction: TextInputAction.done,
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: DealGoSpacing.s8),
+              SwitchListTile(
+                key: const Key('merchant-option-available'),
+                contentPadding: EdgeInsets.zero,
+                value: _available,
+                title: Text(l10n.merchantOptionsChoiceAvailable),
+                onChanged: (value) => setState(() => _available = value),
+              ),
+              const SizedBox(height: DealGoSpacing.s20),
+              if (widget.choice != null) ...[
+                DealGoSecondaryButton(
+                  key: const Key('merchant-option-delete'),
+                  label: l10n.merchantOptionsDelete,
+                  tone: DealGoSecondaryTone.danger,
+                  onPressed: () {
+                    FocusScope.of(context).unfocus();
+                    Navigator.of(
+                      context,
+                    ).pop(const _ChoiceEdit('', 0, true, delete: true));
+                  },
+                ),
+                const SizedBox(height: DealGoSpacing.s8),
+              ],
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: DealGoSecondaryButton(
+                        label: l10n.actionCancel,
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ),
+                    const SizedBox(width: DealGoSpacing.s12),
+                    Expanded(
+                      child: DealGoPrimaryButton(
+                        key: const Key('merchant-option-apply'),
+                        label: l10n.merchantOptionsApply,
+                        enabled: ok,
+                        onPressed: () {
+                          if (!ok) return;
+                          FocusScope.of(context).unfocus();
+                          Navigator.of(context).pop(
+                            _ChoiceEdit(
+                              _name.text.trim(),
+                              extra,
+                              _available,
+                              maxQuantity: maxQ,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          DealGoTextField(
-            label: l10n.merchantOptionsChoicePrice,
-            fieldKey: const Key('merchant-option-price'),
-            controller: _price,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onChanged: (_) => setState(() {}),
-          ),
-          DealGoTextField(
-            label: l10n.merchantOptionsChoiceMaxQty,
-            fieldKey: const Key('merchant-option-max-qty'),
-            controller: _maxQty,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            onChanged: (_) => setState(() {}),
-          ),
-          SwitchListTile(
-            key: const Key('merchant-option-available'),
-            contentPadding: EdgeInsets.zero,
-            value: _available,
-            title: Text(l10n.merchantOptionsChoiceAvailable),
-            onChanged: (value) => setState(() => _available = value),
-          ),
-        ],
+        ),
       ),
-      actions: [
-        if (widget.choice != null)
-          TextButton(
-            key: const Key('merchant-option-delete'),
-            onPressed: () =>
-                Navigator.of(context)
-                    .pop(const _ChoiceEdit('', 0, true, delete: true)),
-            child: Text(
-              l10n.merchantOptionsDelete,
-              style: const TextStyle(color: DealGoColors.danger),
-            ),
-          ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(l10n.actionCancel),
-        ),
-        FilledButton(
-          key: const Key('merchant-option-apply'),
-          onPressed: ok
-              ? () => Navigator.of(context).pop(
-                  _ChoiceEdit(
-                    _name.text.trim(),
-                    extra,
-                    _available,
-                    maxQuantity: maxQ,
-                  ),
-                )
-              : null,
-          child: Text(l10n.merchantOptionsApply),
-        ),
-      ],
     );
   }
 }

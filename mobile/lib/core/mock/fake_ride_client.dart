@@ -23,6 +23,7 @@ class FakeRideClient implements RideClient {
   final List<String> getCalls = [];
   final List<String> cancelCalls = [];
   final List<String> openCalls = [];
+  final List<({String accessToken, String rideId})> dismissCalls = [];
   final List<SubmitRideOfferRequest> offerCalls = [];
   final List<({String rideId, RideDriverAction action})> advanceCalls = [];
 
@@ -43,6 +44,14 @@ class FakeRideClient implements RideClient {
     return List.unmodifiable([
       for (final ride in openRides) OpenRideModel.fromEntity(ride),
     ]);
+  }
+
+  @override
+  Future<void> dismissRide({
+    required String accessToken,
+    required String rideId,
+  }) async {
+    dismissCalls.add((accessToken: accessToken, rideId: rideId));
   }
 
   @override

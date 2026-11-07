@@ -6,8 +6,6 @@ import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/design_system/components/dealgo_app_header.dart';
-import '../../../core/l10n/api_error_text.dart';
-import '../../../core/network/api_exception.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
 import '../../../core/design_system/tokens/dealgo_tokens.dart';
 import '../../../l10n/app_localizations.dart';
@@ -15,7 +13,6 @@ import '../../identity/domain/entities/auth_method_policy.dart';
 import '../../legal/legal_document_page.dart';
 import '../../legal/legal_documents.dart';
 import '../../identity/domain/entities/auth_state.dart';
-import '../../identity/domain/passkey_platform.dart';
 import '../../identity/presentation/auth_methods_store.dart';
 import '../../identity/presentation/cubit/auth_cubit.dart';
 import '../domain/account_settings.dart';
@@ -88,13 +85,6 @@ class _SecurityPageState extends State<SecurityPage> {
         child: ListView(
           padding: const EdgeInsets.all(DealGoDimensions.pageGutter),
           children: [
-            Text(
-              l10n.securityTitle,
-              style: textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 16),
             _Banner(icon: DealGoIcons.shield, title: l10n.securityProtected),
             const SizedBox(height: 20),
             Text(l10n.securityLoginSection, style: textTheme.titleMedium),
@@ -130,7 +120,7 @@ class _SecurityPageState extends State<SecurityPage> {
                       onTap: () =>
                           context.push(AccountRoutes.changePassword(shellPath)),
                     ),
-                  if (_passkeyEnabled) const _PasskeyRow(),
+                  if (_passkeyEnabled) _PasskeyRow(shellPath: shellPath),
                   _Row(
                     icon: DealGoIcons.devices,
                     title: l10n.securitySessions,
@@ -153,8 +143,7 @@ class _SecurityPageState extends State<SecurityPage> {
                 _Row(
                   icon: DealGoIcons.document,
                   title: l10n.securityTerms,
-                  onTap: () =>
-                      LegalDocumentPage.open(context, LegalSlug.terms),
+                  onTap: () => LegalDocumentPage.open(context, LegalSlug.terms),
                 ),
               ],
             ),
@@ -252,83 +241,53 @@ class _Row extends StatelessWidget {
   }
 }
 
-/// S025 passkey enrolment (DEC-PROD-045). Wired to the existing registration endpoints;
-/// devices or builds that cannot create passkeys get a calm explanation, never a crash.
+/// Opens passkey management (list / add / remove). Sign-in with a passkey is
+/// on the login screen; here the row only shows what is set up.
 class _PasskeyRow extends StatefulWidget {
-  const _PasskeyRow();
+  const _PasskeyRow({required this.shellPath});
+
+  final String shellPath;
 
   @override
   State<_PasskeyRow> createState() => _PasskeyRowState();
 }
 
 class _PasskeyRowState extends State<_PasskeyRow> {
-  bool _busy = false;
+  int? _count;
 
-  void _say(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadCount());
   }
 
-  Future<void> _enroll() async {
-    final l10n = AppLocalizations.of(context);
+  Future<void> _loadCount() async {
     final auth = context.read<AuthCubit>().state;
-    if (auth is! AuthSignedIn || _busy) return;
-    final settings = context.read<AccountSettingsRepository>();
-    final platform = context.read<PasskeyPlatform>();
-    final token = auth.tokens.accessToken;
-    setState(() => _busy = true);
+    if (auth is! AuthSignedIn) return;
     try {
-      final options = await settings.passkeyRegistrationOptions(
-        accessToken: token,
+      final rows = await context.read<AccountSettingsRepository>().passkeys(
+        accessToken: auth.tokens.accessToken,
       );
-      final response = await platform.register(options);
-      await settings.verifyPasskeyRegistration(
-        accessToken: token,
-        response: response,
-      );
-      if (mounted) _say(l10n.securityPasskeyAdded);
-    } on PasskeyPlatformException catch (error) {
-      if (!mounted) return;
-      switch (error.kind) {
-        case PasskeyFailureKind.cancelled:
-          break;
-        case PasskeyFailureKind.unsupported:
-          _say(l10n.securityPasskeyUnsupported);
-        case PasskeyFailureKind.alreadyRegistered:
-          _say(l10n.securityPasskeyExists);
-        case PasskeyFailureKind.failed:
-        case PasskeyFailureKind.noCredentials:
-          _say(l10n.securityPasskeyFailed);
-      }
-    } on ApiException catch (error) {
-      if (!mounted) return;
-      _say(switch (error.errorCode) {
-        'WEBAUTHN_NOT_CONFIGURED' => l10n.securityPasskeyUnsupported,
-        'AUTH_PASSKEY_EXISTS' => l10n.securityPasskeyExists,
-        'FORBIDDEN' => l10n.securityPasskeyNeedsVerifiedLogin,
-        'AUTH_PASSKEY_INVALID' => l10n.securityPasskeyFailed,
-        _ => apiErrorText(l10n, error),
-      });
-    } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _count = rows.length);
+    } catch (_) {
+      // The page itself reports load failures; the row just omits the count.
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final count = _count;
     return ListTile(
       key: const Key('security-passkey-row'),
-      leading: const Icon(DealGoIcons.shieldPlain, color: DealGoColors.primary),
+      leading: const Icon(DealGoIcons.fingerprint, color: DealGoColors.primary),
       title: Text(l10n.securityPasskey),
-      trailing: _busy
-          ? const SizedBox.square(
-              dimension: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Icon(DealGoIcons.chevronRight),
-      onTap: _busy ? null : _enroll,
+      subtitle: count == null ? null : Text(l10n.securityPasskeysCount(count)),
+      trailing: const Icon(DealGoIcons.chevronRight),
+      onTap: () async {
+        await context.push(AccountRoutes.passkeys(widget.shellPath));
+        if (mounted) unawaited(_loadCount());
+      },
     );
   }
 }

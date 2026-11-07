@@ -15,7 +15,9 @@ import '../cubit/merchant_states.dart';
 import '../widgets/merchant_widgets.dart';
 import '../../../../core/format/short_ref.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../../core/config/api_base_url.dart';
 import '../../../../core/design_system/components/dealgo_nav_insets.dart';
+import '../../../../core/design_system/components/dealgo_profile_avatar.dart';
 import '../../../../core/design_system/components/dealgo_refresh.dart';
 
 class MerchantOrdersPage extends StatefulWidget {
@@ -266,11 +268,27 @@ class _OrderCard extends StatelessWidget {
                     MerchantChip(
                       label: l10n.merchantOrderCustomerName(name),
                       tone: MerchantChipTone.neutral,
+                      leading: order.customerAvatarUrl != null &&
+                              order.customerAvatarUrl!.isNotEmpty
+                          ? DealGoProfileAvatar(
+                              avatarUrl:
+                                  resolveMediaUrl(order.customerAvatarUrl),
+                              size: 16,
+                            )
+                          : null,
                     ),
                   if (order.driverName case final name?)
                     MerchantChip(
                       label: l10n.merchantOrderDriverName(name),
                       tone: MerchantChipTone.green,
+                      leading: order.driverAvatarUrl != null &&
+                              order.driverAvatarUrl!.isNotEmpty
+                          ? DealGoProfileAvatar(
+                              avatarUrl:
+                                  resolveMediaUrl(order.driverAvatarUrl),
+                              size: 16,
+                            )
+                          : null,
                     ),
                 ],
               ),
@@ -308,8 +326,8 @@ class _OrderCard extends StatelessWidget {
                         )
                       : Icon(
                           action == MerchantQuickAction.accept
-                              ? Icons.check_rounded
-                              : Icons.room_service_outlined,
+                              ? DealGoIcons.check
+                              : DealGoIcons.food,
                         ),
                   label: Text(
                     action == MerchantQuickAction.accept

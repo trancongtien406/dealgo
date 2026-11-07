@@ -297,7 +297,7 @@ export class MerchantCatalogController {
   @Patch('items/:itemId')
   @ApiOperation({
     summary:
-      'M027 update an owned catalog item (name/price/originalPriceVnd/description/category/prep/image/availability); originalPriceVnd is shown struck through only while above the price, null clears',
+      'M027 update an owned catalog item (name/price/originalPriceVnd/description/category/prep/image/newImages/optionGroups/availability); originalPriceVnd is shown struck through only while above the price, null clears',
   })
   updateItem(
     @CurrentActor() actor: RequestActor,
@@ -305,6 +305,18 @@ export class MerchantCatalogController {
     @Body() dto: UpdateFoodItemDto,
   ) {
     return this.catalog.updateItem(actor, itemId, dto);
+  }
+
+  @Delete('items/:itemId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Delete an owned catalog item and discard its stored photos',
+  })
+  deleteItem(
+    @CurrentActor() actor: RequestActor,
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+  ) {
+    return this.catalog.deleteItem(actor, itemId);
   }
 
   @Put('items/:itemId/options')

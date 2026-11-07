@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/design_system/components/dealgo_card.dart';
 import '../../../core/design_system/components/dealgo_chip.dart';
 import '../../../core/design_system/components/dealgo_refresh.dart';
+import '../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../core/design_system/components/dealgo_state_view.dart';
 import '../../../core/design_system/components/dealgo_text_field.dart';
 import '../../../core/design_system/icons/dealgo_icons.dart';
@@ -145,7 +146,7 @@ class _SupportTicketDetailPageState extends State<SupportTicketDetailPage> {
             Expanded(
               child: ticket == null
                   ? (_loading
-                        ? const Center(child: CircularProgressIndicator())
+                        ? const DealGoSkeletonList(itemCount: 3)
                         : DealGoRefresh(
                             onRefresh: _load,
                             child: DealGoStateView.failure(

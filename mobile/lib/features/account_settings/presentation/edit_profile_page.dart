@@ -164,6 +164,7 @@ class _EditProfilePageState extends State<EditProfilePage> with TextDraftMixin {
         builder: (context, _) => DealGoPrimaryButton(
           label: l10n.editProfileSave,
           isLoading: _busy,
+          fullWidth: true,
           enabled: _form.isComplete && !_busy,
           onPressed: _save,
         ),

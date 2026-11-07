@@ -93,19 +93,148 @@ export class MenuItemImageService {
       throw imageError(404, 'FOOD_ITEM_NOT_FOUND', 'Item not found');
     }
     const current = await this.ownedItem(actor, itemId);
-    const keys = [
-      keyFromMenuItemImageUrl(current.imageUrl),
-      ...((current.imageUrls ?? []).map(keyFromMenuItemImageUrl)),
-    ].filter((k): k is string => !!k);
-    const unique = [...new Set(keys)];
     const updated = await this.food.updateItem(actor, itemId, {
       imageUrl: null,
       imageUrls: [],
     } as import('../food-order/food.dto.js').UpdateFoodItemDto);
-    if (unique.length) {
+    await this.discardUrls([current.imageUrl, ...(current.imageUrls ?? [])]);
+    return updated;
+  }
+
+  /**
+   * Unified form photo handler: keeps selected existing photos, uploads newly picked
+   * photos in the same form request, updates imageUrl/imageUrls, and discards removed files.
+   */
+  async syncFormImages(
+    actor: RequestActor,
+    item: StoreItemView,
+    input: {
+      keptImageUrls?: string[];
+      clearAll?: boolean;
+      newImages?: Array<{
+        contentBase64?: string;
+        dataUrl?: string;
+        contentType?: string;
+      }>;
+    },
+  ): Promise<StoreItemView> {
+    const currentUrls = [
+      ...(item.imageUrls ?? []),
+      ...(item.imageUrl && !(item.imageUrls ?? []).includes(item.imageUrl)
+        ? [item.imageUrl]
+        : []),
+    ].filter((u): u is string => Boolean(u));
+
+    let keptUrls: string[];
+    if (input.clearAll) {
+      keptUrls = [];
+    } else if (input.keptImageUrls !== undefined) {
+      const allowedSet = new Set(currentUrls);
+      keptUrls = [];
+      for (const u of input.keptImageUrls) {
+        if (allowedSet.has(u) && !keptUrls.includes(u)) {
+          keptUrls.push(u);
+        }
+      }
+    } else {
+      keptUrls = [...currentUrls];
+    }
+
+    const newInputs = input.newImages ?? [];
+    const payloads = newInputs.map((entry) => {
+      const resolved = resolvePayload(entry);
+      if (!resolved) {
+        throw imageError(
+          400,
+          'VALIDATION_ERROR',
+          'contentBase64 or dataUrl is required',
+        );
+      }
+      const declared = resolved.contentType?.toLowerCase();
+      const normalized = declared === 'image/jpg' ? 'image/jpeg' : declared;
+      if (
+        normalized &&
+        !(MENU_ITEM_IMAGE_TYPES as readonly string[]).includes(normalized)
+      ) {
+        throw imageError(
+          415,
+          'UPLOAD_TYPE_NOT_ALLOWED',
+          'Menu photo must be a JPEG, PNG or WebP image',
+        );
+      }
+      return resolved;
+    });
+
+    const maxImages = await this.settings.getNumber('MENU_ITEM_MAX_IMAGES');
+    if (keptUrls.length + payloads.length > maxImages) {
+      throw imageError(
+        400,
+        'MENU_IMAGE_LIMIT',
+        `At most ${maxImages} photos per item`,
+      );
+    }
+
+    let updatedItem = item;
+    if (payloads.length > 0) {
+      updatedItem = await this.uploads.storePublicThen(
+        `menu-items/${item.id}`,
+        payloads.map((p) => ({
+          label: 'menu-item',
+          contentType: p.contentType,
+          contentBase64: p.base64,
+        })),
+        async (refs) => {
+          for (const ref of refs) {
+            if (
+              !(MENU_ITEM_IMAGE_TYPES as readonly string[]).includes(
+                ref.contentType,
+              )
+            ) {
+              throw imageError(
+                415,
+                'UPLOAD_TYPE_NOT_ALLOWED',
+                'Menu photo must be a JPEG, PNG or WebP image',
+              );
+            }
+          }
+          const uploadedUrls = refs.map((ref) =>
+            menuItemImagePath(item.id, ref.key),
+          );
+          const finalUrls = [...keptUrls, ...uploadedUrls];
+          return this.food.updateItem(actor, item.id, {
+            imageUrl: finalUrls[0] ?? null,
+            imageUrls: finalUrls,
+          } as import('../food-order/food.dto.js').UpdateFoodItemDto);
+        },
+      );
+    } else if (
+      input.clearAll ||
+      (input.keptImageUrls !== undefined &&
+        (keptUrls.length !== currentUrls.length ||
+          keptUrls.some((u, idx) => u !== currentUrls[idx])))
+    ) {
+      updatedItem = await this.food.updateItem(actor, item.id, {
+        imageUrl: keptUrls[0] ?? null,
+        imageUrls: keptUrls,
+      } as import('../food-order/food.dto.js').UpdateFoodItemDto);
+    }
+
+    const keptSet = new Set(keptUrls);
+    const removedUrls = currentUrls.filter((u) => !keptSet.has(u));
+    if (removedUrls.length > 0) {
+      await this.discardUrls(removedUrls);
+    }
+    return updatedItem;
+  }
+
+  async discardUrls(urls: Array<string | null | undefined>): Promise<void> {
+    const keys = urls
+      .map((u) => keyFromMenuItemImageUrl(u))
+      .filter((k): k is string => Boolean(k));
+    const unique = [...new Set(keys)];
+    if (unique.length > 0) {
       await this.uploads.discard(unique.map((key) => ({ key })));
     }
-    return updated;
   }
 
   /** Serves only the item's current photo; replaced or guessed keys answer 404. */

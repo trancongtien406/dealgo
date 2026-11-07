@@ -239,6 +239,77 @@ void main() {
       find.textContaining('Lần nộp gần nhất: 20/10–22/10'),
       findsOneWidget,
     );
+
+    // Test opening settlement history sheet
+    final historyBtn = find.byKey(const Key('merchant-statement-history-btn'));
+    expect(historyBtn, findsOneWidget);
+    await tester.tap(historyBtn);
+    await tester.pumpAndSettle();
+    expect(find.text('Lịch sử các kỳ đối soát'), findsOneWidget);
+  });
+
+  testWidgets('interactive chart allows switching metric and selecting day bar',
+      (tester) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final stats = FakeMerchantStatsRemoteDataSource(
+      result: decodeMerchantStats(Map<String, Object?>.from(_payload)),
+    );
+    final orders = FakeMerchantOrdersClient(
+      onGetCatalog: () =>
+          const FoodStoreDetail(id: 'store-1', name: 'Quán Hà', items: []),
+    );
+    await tester.pumpWidget(
+      MultiRepositoryProvider(
+        providers: [
+          RepositoryProvider<MerchantStatsRepository>.value(value: stats),
+          RepositoryProvider<GetMerchantCatalog>.value(
+            value: GetMerchantCatalog(MerchantOrdersRepositoryImpl(orders)),
+          ),
+          RepositoryProvider<RatingRepository>.value(value: _Ratings()),
+        ],
+        child: BlocProvider<AuthCubit>.value(
+          value: _SignedIn(),
+          child: const MaterialApp(
+            localizationsDelegates: testLocalizationsDelegates,
+            supportedLocales: [testLocale],
+            locale: testLocale,
+            home: MerchantStatsPage(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify Quick Navigation chips exist
+    expect(find.byKey(const Key('stats-quick-history')), findsOneWidget);
+    expect(find.byKey(const Key('stats-quick-offers')), findsOneWidget);
+    expect(find.byKey(const Key('stats-quick-reviews')), findsOneWidget);
+
+    // Verify KPI grid
+    expect(find.byKey(const Key('stats-kpi-aov')), findsOneWidget);
+    expect(find.byKey(const Key('stats-kpi-daily-avg')), findsOneWidget);
+    expect(find.byKey(const Key('stats-kpi-completion')), findsOneWidget);
+    expect(find.byKey(const Key('stats-kpi-peak-day')), findsOneWidget);
+
+    // Verify selected day panel is rendered
+    expect(find.byKey(const Key('stats-selected-day-panel')), findsOneWidget);
+
+    // Switch metric to Revenue
+    await tester.tap(find.text('Doanh thu'));
+    await tester.pumpAndSettle();
+
+    // Tap a specific bar to select day
+    final bar = find.byKey(const Key('stats-bar-2026-10-18'));
+    expect(bar, findsOneWidget);
+    await tester.tap(bar);
+    await tester.pumpAndSettle();
+
+    // Tap the selected day panel to open day details sheet
+    await tester.tap(find.byKey(const Key('stats-selected-day-panel')));
+    await tester.pumpAndSettle();
+    expect(find.text('Chi tiết ngày 18/10'), findsOneWidget);
   });
 }
 

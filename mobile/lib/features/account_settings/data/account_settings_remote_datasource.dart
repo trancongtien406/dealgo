@@ -131,6 +131,34 @@ class DioAccountSettingsRemoteDataSource implements AccountSettingsRepository {
   }
 
   @override
+  Future<List<AccountPasskey>> passkeys({required String accessToken}) async {
+    try {
+      final res = await dio.get<Object?>(
+        ApiPaths.passkeys,
+        options: _auth(accessToken),
+      );
+      return decodeAccountPasskeys(requireSuccessData(res.data));
+    } on DioException catch (error) {
+      throw apiExceptionFromDio(error);
+    }
+  }
+
+  @override
+  Future<void> deletePasskey({
+    required String accessToken,
+    required String passkeyId,
+  }) async {
+    try {
+      await dio.delete<Object?>(
+        ApiPaths.passkey(passkeyId),
+        options: _auth(accessToken),
+      );
+    } on DioException catch (error) {
+      throw apiExceptionFromDio(error);
+    }
+  }
+
+  @override
   Future<Map<String, Object?>> passkeyRegistrationOptions({
     required String accessToken,
   }) async {
@@ -305,6 +333,23 @@ class FakeAccountSettingsRepository implements AccountSettingsRepository {
     calls.add('touch:$deviceLabel');
   }
 
+  final List<AccountPasskey> fakePasskeys = [];
+
+  @override
+  Future<List<AccountPasskey>> passkeys({required String accessToken}) async {
+    calls.add('passkeys');
+    return List.of(fakePasskeys);
+  }
+
+  @override
+  Future<void> deletePasskey({
+    required String accessToken,
+    required String passkeyId,
+  }) async {
+    calls.add('deletePasskey:$passkeyId');
+    fakePasskeys.removeWhere((p) => p.id == passkeyId);
+  }
+
   @override
   Future<Map<String, Object?>> passkeyRegistrationOptions({
     required String accessToken,
@@ -330,5 +375,12 @@ class FakeAccountSettingsRepository implements AccountSettingsRepository {
   }) async {
     calls.add('passkeyVerify');
     passkeysRegistered += 1;
+    fakePasskeys.add(
+      AccountPasskey(
+        id: 'pk-$passkeysRegistered',
+        createdAt: DateTime.now(),
+        backedUp: true,
+      ),
+    );
   }
 }

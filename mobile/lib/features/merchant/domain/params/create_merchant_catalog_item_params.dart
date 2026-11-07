@@ -1,3 +1,6 @@
+import '../../../food/domain/entities/food_models.dart';
+import '../entities/merchant_menu_models.dart';
+
 class CreateMerchantCatalogItemParams {
   const CreateMerchantCatalogItemParams({
     required this.accessToken,
@@ -7,6 +10,9 @@ class CreateMerchantCatalogItemParams {
     this.description,
     this.prepMinutes,
     this.menuCategoryId,
+    this.originalPriceVnd,
+    this.newImages,
+    this.optionGroups,
   });
 
   final String accessToken;
@@ -16,4 +22,7 @@ class CreateMerchantCatalogItemParams {
   final String? description;
   final int? prepMinutes;
   final String? menuCategoryId;
+  final int? originalPriceVnd;
+  final List<MerchantItemImageUpload>? newImages;
+  final List<FoodOptionGroup>? optionGroups;
 }

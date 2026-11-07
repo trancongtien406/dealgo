@@ -78,7 +78,7 @@ void main() {
     await tester.ensureVisible(row);
     await tester.tap(row);
     await tester.pumpAndSettle();
-    expect(find.text('Thông báo của bạn'), findsOneWidget);
+    expect(find.text('Cài đặt thông báo'), findsOneWidget);
     await tester.ensureVisible(find.text('Lưu cài đặt'));
     await tester.tap(find.text('Lưu cài đặt'));
     await tester.pump(); // start _save
@@ -103,8 +103,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Thiết bị và phiên đăng nhập'));
     await tester.pumpAndSettle();
-    expect(find.text('Phiên hoạt động'), findsOneWidget);
+    expect(find.text('Thiết bị đăng nhập'), findsOneWidget);
     expect(find.text('MacBook · Safari'), findsOneWidget);
+    await tester.tap(find.text('Đăng xuất').last);
+    await tester.pumpAndSettle();
+    // Confirmation first: nothing is revoked until it is accepted.
+    expect(repo.calls, isNot(contains('revoke:sess-other')));
     await tester.tap(find.text('Đăng xuất').last);
     await tester.pumpAndSettle();
     expect(repo.calls, contains('revoke:sess-other'));
@@ -134,12 +138,16 @@ void main() {
       await openSecurity(tester);
       await tester.tap(find.byKey(const Key('security-passkey-row')));
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('passkeys-add')));
+      await tester.pumpAndSettle();
       expect(
         repo.calls,
         containsAllInOrder(['passkeyOptions', 'passkeyVerify']),
       );
       expect(passkeys.registerCalls.single['challenge'], 'fake-challenge');
       expect(find.text('Đã thêm passkey cho tài khoản.'), findsOneWidget);
+      // The new passkey now shows in the list.
+      expect(find.byKey(const Key('passkey-pk-1')), findsOneWidget);
     },
   );
 
@@ -157,6 +165,8 @@ void main() {
     );
     await openSecurity(tester);
     await tester.tap(find.byKey(const Key('security-passkey-row')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('passkeys-add')));
     await tester.pumpAndSettle();
     expect(repo.calls, isNot(contains('passkeyVerify')));
     expect(find.textContaining('chưa hỗ trợ passkey'), findsOneWidget);
@@ -178,6 +188,8 @@ void main() {
       );
       await openSecurity(tester);
       await tester.tap(find.byKey(const Key('security-passkey-row')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('passkeys-add')));
       await tester.pumpAndSettle();
       final l10n = lookupAppLocalizations(const Locale('vi'));
       expect(find.text(l10n.apiErrNotFound), findsOneWidget);

@@ -1,3 +1,5 @@
+import 'package:dealgo/core/design_system/components/dealgo_state_view.dart';
+import 'package:dealgo/core/network/api_exception.dart';
 import 'package:dealgo/features/account_deletion/data/account_deletion_remote_datasource.dart';
 import 'package:dealgo/features/account_deletion/domain/account_deletion.dart';
 import 'package:dealgo/features/account_deletion/presentation/delete_account_page.dart';
@@ -314,4 +316,51 @@ void main() {
       expect(repo.calls, ['overview']);
     },
   );
+
+  testWidgets(
+    'S027 overview load failure renders DealGoStateView and retries',
+    (tester) async {
+      final repo = _FailingOverviewDeletionRepo();
+      await pumpSignedIn(
+        tester,
+        profile: customerProfile,
+        accountDeletion: repo,
+      );
+      await tester.tap(navLabel('Tôi'));
+      await tester.pumpAndSettle();
+      final row = find.byKey(const ValueKey('account-delete-row'));
+      await tester.ensureVisible(row);
+      await tester.tap(row);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(DealGoStateView), findsOneWidget);
+      expect(find.byKey(const Key('state-view-action')), findsOneWidget);
+
+      repo.shouldFail = false;
+      await tester.tap(find.byKey(const Key('state-view-action')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('delete-account-form')), findsOneWidget);
+      expect(repo.calls.where((c) => c == 'overview').length, 2);
+    },
+  );
+}
+
+class _FailingOverviewDeletionRepo extends FakeAccountDeletionRepository {
+  bool shouldFail = true;
+
+  @override
+  Future<AccountDeletionOverview> overview({
+    required String accessToken,
+  }) async {
+    if (shouldFail) {
+      calls.add('overview');
+      throw const ApiException(
+        statusCode: 500,
+        message: 'Server error',
+        errorCode: 'SERVER_ERROR',
+      );
+    }
+    return super.overview(accessToken: accessToken);
+  }
 }

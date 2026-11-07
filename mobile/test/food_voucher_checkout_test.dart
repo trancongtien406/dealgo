@@ -3,6 +3,9 @@ import 'package:dealgo/features/food/data/models/place_food_order_body.dart';
 import 'package:dealgo/features/food/domain/entities/food_models.dart';
 import 'package:dealgo/features/food/domain/params/place_food_order_params.dart';
 import 'package:dealgo/features/food/presentation/cubit/food_cart_cubit.dart';
+import 'package:dealgo/features/food/presentation/widgets/food_checkout_widgets.dart';
+import 'package:dealgo/l10n/app_localizations.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -13,7 +16,7 @@ void main() {
     available: true,
   );
 
-  test('cart nets the quoted voucher and drops it when the basket changes', () {
+  test('cart nets the quoted voucher and keeps its code for revalidation', () {
     final cart = FoodCartCubit()
       ..addItem(storeId: 'store-1', storeName: 'Quán', item: item)
       ..applyVoucher(code: 'FOOD20', discountVnd: 20000);
@@ -22,7 +25,7 @@ void main() {
     expect(cart.state.previewTotalVnd, base - 20000);
 
     cart.addItem(storeId: 'store-1', storeName: 'Quán', item: item);
-    expect(cart.state.voucherCode, isNull);
+    expect(cart.state.voucherCode, 'FOOD20');
     expect(cart.state.voucherDiscountVnd, 0);
     cart.close();
   });
@@ -53,6 +56,26 @@ void main() {
       PlaceFoodOrderBody.fromParams(plain).toJson().containsKey('voucherCode'),
       isFalse,
     );
+  });
+
+  test('an unqualified remembered voucher explains the checkout blocker', () {
+    final cart = FoodCartCubit()
+      ..addItem(storeId: 'store-1', storeName: 'Quán', item: item)
+      ..setDropoff(label: '123 Nguyễn Văn Linh', lat: 10.77, lng: 106.7)
+      ..setDeliveryFare(15000)
+      ..applyVoucher(code: 'FOOD20');
+    final l10n = lookupAppLocalizations(const Locale('vi'));
+
+    expect(cart.state.canCheckout, isFalse);
+    expect(
+      checkoutBlockingMessage(cart.state, l10n),
+      l10n.checkoutVoucherRejected,
+    );
+
+    cart.applyVoucher();
+    expect(cart.state.canCheckout, isTrue);
+    expect(checkoutBlockingMessage(cart.state, l10n), isNull);
+    cart.close();
   });
 
   test('decodes the server discount and ready-job store details', () {

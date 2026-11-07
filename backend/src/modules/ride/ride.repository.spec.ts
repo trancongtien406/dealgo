@@ -41,6 +41,22 @@ describe('MemoryRideRepository', () => {
     expect(openList[0].status).toBe('NEGOTIATING');
   });
 
+  it('persists a dismissal per ride and driver and filters only that driver', async () => {
+    const repo = new MemoryRideRepository();
+    const ride = await repo.create(makeInput('cust-1', 'idem-1'));
+
+    await repo.dismissRequest(ride.id, 'driver-c', now);
+    await repo.dismissRequest(ride.id, 'driver-c', now);
+
+    await expect(repo.dismissedRequestIds('driver-c', [ride.id])).resolves.toEqual(
+      new Set([ride.id]),
+    );
+    await expect(repo.dismissedRequestIds('driver-d', [ride.id])).resolves.toEqual(new Set());
+    await expect(repo.undismissedDriverIds(ride.id, ['driver-c', 'driver-d'])).resolves.toEqual([
+      'driver-d',
+    ]);
+  });
+
   it('paginates customer ride history', async () => {
     const repo = new MemoryRideRepository();
     await repo.create(makeInput('cust-1', 'idem-1'));

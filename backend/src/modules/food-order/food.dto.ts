@@ -236,6 +236,23 @@ export class PlaceFoodOrderDto {
   utensils?: boolean;
 }
 
+export class UploadMenuItemImageDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(8 * 1024 * 1024)
+  contentBase64?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(8 * 1024 * 1024)
+  dataUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  contentType?: string;
+}
+
 export class CreateFoodItemDto {
   @IsString()
   @MinLength(1)
@@ -250,7 +267,9 @@ export class CreateFoodItemDto {
 
   @IsOptional()
   @ValidateIf((_, v) => v !== null)
-  @Type(() => Number)
+  @Transform(({ value }) =>
+    value === null || value === '' || value === undefined ? null : Number(value),
+  )
   @IsInt()
   @Min(1)
   @Max(2_147_483_647)
@@ -261,18 +280,23 @@ export class CreateFoodItemDto {
   available?: boolean;
 
   @IsOptional()
+  @ValidateIf((_, v) => v !== null)
   @IsString()
   @MaxLength(500)
   description?: string | null;
 
   @IsOptional()
-  @Type(() => Number)
+  @ValidateIf((_, v) => v !== null)
+  @Transform(({ value }) =>
+    value === null || value === '' || value === undefined ? null : Number(value),
+  )
   @IsInt()
   @Min(1)
   @Max(240)
   prepMinutes?: number | null;
 
   @IsOptional()
+  @ValidateIf((_, v) => v !== null)
   @IsString()
   @MaxLength(400)
   imageUrl?: string | null;
@@ -283,9 +307,24 @@ export class CreateFoodItemDto {
   imageUrls?: string[];
 
   @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(8)
+  @ValidateNested({ each: true })
+  @Type(() => UploadMenuItemImageDto)
+  newImages?: UploadMenuItemImageDto[];
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
   @IsString()
   @MaxLength(36)
   menuCategoryId?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @ValidateNested({ each: true })
+  @Type(() => FoodOptionGroupDto)
+  optionGroups?: FoodOptionGroupDto[];
 }
 
 export class UpdateFoodItemDto {
@@ -304,7 +343,9 @@ export class UpdateFoodItemDto {
 
   @IsOptional()
   @ValidateIf((_, v) => v !== null)
-  @Type(() => Number)
+  @Transform(({ value }) =>
+    value === null || value === '' || value === undefined ? null : Number(value),
+  )
   @IsInt()
   @Min(1)
   @Max(2_147_483_647)
@@ -315,18 +356,23 @@ export class UpdateFoodItemDto {
   available?: boolean;
 
   @IsOptional()
+  @ValidateIf((_, v) => v !== null)
   @IsString()
   @MaxLength(500)
   description?: string | null;
 
   @IsOptional()
-  @Type(() => Number)
+  @ValidateIf((_, v) => v !== null)
+  @Transform(({ value }) =>
+    value === null || value === '' || value === undefined ? null : Number(value),
+  )
   @IsInt()
   @Min(1)
   @Max(240)
   prepMinutes?: number | null;
 
   @IsOptional()
+  @ValidateIf((_, v) => v !== null)
   @IsString()
   @MaxLength(400)
   imageUrl?: string | null;
@@ -337,9 +383,24 @@ export class UpdateFoodItemDto {
   imageUrls?: string[];
 
   @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(8)
+  @ValidateNested({ each: true })
+  @Type(() => UploadMenuItemImageDto)
+  newImages?: UploadMenuItemImageDto[];
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
   @IsString()
   @MaxLength(36)
   menuCategoryId?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10)
+  @ValidateNested({ each: true })
+  @Type(() => FoodOptionGroupDto)
+  optionGroups?: FoodOptionGroupDto[];
 }
 
 export class UpsertMenuCategoryDto {

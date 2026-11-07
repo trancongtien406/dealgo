@@ -6,7 +6,7 @@ import type { AppEnv } from '../../platform/config/env.js';
 import { hashRefreshToken } from '../../platform/security/token-crypto.js';
 
 describe('SessionService', () => {
-  const createService = () => {
+  const createService = (presenceRepo?: unknown) => {
     const repository = new MemoryIdentityRepository();
     const configValues: Partial<AppEnv> = {
       NODE_ENV: 'test',
@@ -19,7 +19,7 @@ describe('SessionService', () => {
       get: (key: keyof AppEnv) => configValues[key],
     } as unknown as ConfigService<AppEnv, true>;
 
-    const service = new SessionService(repository, config);
+    const service = new SessionService(repository, config, presenceRepo as never);
     return { service, repository };
   };
 
@@ -212,5 +212,28 @@ describe('SessionService', () => {
         errorCode: 'AUTH_REFRESH_INVALID',
       }),
     });
+  });
+
+  it('sets driver presence offline when the last session is revoked', async () => {
+    const presenceRepo = {
+      findByUserId: vi.fn().mockResolvedValue({ userId: 'u1', online: true }),
+      upsert: vi.fn().mockResolvedValue({ userId: 'u1', online: false }),
+    };
+    const { service, repository } = createService(presenceRepo);
+    const user = await repository.createUser({
+      email: 'driver2@dealgo.vn',
+      phone: '+84909888888',
+      displayName: 'Driver Test',
+    });
+    await service.issue(user, 'customer');
+
+    const sessions = await repository.listActiveSessions(user.id);
+    expect(sessions.length).toBe(1);
+
+    // Revoke the only session
+    await service.revoke(sessions[0]!.id);
+
+    expect(presenceRepo.findByUserId).toHaveBeenCalledWith(user.id);
+    expect(presenceRepo.upsert).toHaveBeenCalledWith(user.id, { online: false });
   });
 });

@@ -277,11 +277,6 @@ class _SupportTicketCreatePageState extends State<SupportTicketCreatePage>
                   DealGoSpacing.s16,
                 ),
                 children: [
-                  Text(
-                    l10n.supportCreateHeading,
-                    style: textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: DealGoSpacing.s20),
                   _PickerField(
                     fieldKey: const Key('support-category-field'),
                     label: l10n.supportFieldCategory,

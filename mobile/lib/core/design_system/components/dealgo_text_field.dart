@@ -35,6 +35,7 @@ class DealGoTextField extends StatefulWidget {
     this.obscureToggleKey,
     this.showLabel = true,
     this.textAlign = TextAlign.start,
+    this.scrollPadding = const EdgeInsets.all(20.0),
     super.key,
   });
 
@@ -76,6 +77,9 @@ class DealGoTextField extends StatefulWidget {
 
   /// Text alignment inside the field (e.g. center for amount/OTP-style inputs).
   final TextAlign textAlign;
+
+  /// Padding around the field when scrolling it into view on focus.
+  final EdgeInsets scrollPadding;
 
   @override
   State<DealGoTextField> createState() => _DealGoTextFieldState();
@@ -143,6 +147,7 @@ class _DealGoTextFieldState extends State<DealGoTextField> {
           onChanged: widget.onChanged,
           onFieldSubmitted: widget.onSubmitted,
           textAlign: widget.textAlign,
+          scrollPadding: widget.scrollPadding,
           style: textTheme.bodyLarge,
           decoration: InputDecoration(
             hintText: widget.hint ?? (widget.showLabel ? null : widget.label),

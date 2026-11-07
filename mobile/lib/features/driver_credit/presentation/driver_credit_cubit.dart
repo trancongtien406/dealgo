@@ -103,12 +103,7 @@ class DriverCreditCubit extends Cubit<DriverCreditState> {
         ),
       );
     } catch (error) {
-      emit(
-        state.copyWith(
-          status: DriverCreditStatus.failed,
-          cause: error,
-        ),
-      );
+      emit(state.copyWith(status: DriverCreditStatus.failed, cause: error));
     }
   }
 
@@ -130,12 +125,7 @@ class DriverCreditCubit extends Cubit<DriverCreditState> {
       emit(state.copyWith(actionError: 'DRIVER_TOP_UP_SESSION_EXPIRED'));
       return null;
     }
-    emit(
-      state.copyWith(
-        submitting: true,
-        clearActionError: true,
-      ),
-    );
+    emit(state.copyWith(submitting: true, clearActionError: true));
     try {
       final topUp = await repository.createTopUp(
         accessToken: token,
@@ -155,7 +145,9 @@ class DriverCreditCubit extends Cubit<DriverCreditState> {
       );
       return null;
     } catch (error) {
-      emit(state.copyWith(submitting: false, actionError: 'UNKNOWN', cause: error));
+      emit(
+        state.copyWith(submitting: false, actionError: 'UNKNOWN', cause: error),
+      );
       return null;
     }
   }
@@ -180,7 +172,9 @@ class DriverCreditCubit extends Cubit<DriverCreditState> {
         ),
       );
     } catch (error) {
-      emit(state.copyWith(cancelling: false, actionError: 'UNKNOWN', cause: error));
+      emit(
+        state.copyWith(cancelling: false, actionError: 'UNKNOWN', cause: error),
+      );
     }
   }
 
@@ -239,12 +233,7 @@ class DriverCreditCubit extends Cubit<DriverCreditState> {
     }
     try {
       final fresh = await repository.topUp(accessToken: token, id: selected.id);
-      emit(
-        state.copyWith(
-          selected: fresh,
-          selectedLoading: false,
-        ),
-      );
+      emit(state.copyWith(selected: fresh, selectedLoading: false));
       if (fresh.status != selected.status) {
         await load();
       }

@@ -362,4 +362,24 @@ describe('VoiceService calls', () => {
     );
     expect((await repo.findById(call.id))?.status).toBe('MISSED');
   });
+
+  it('sends an Android data-only Call.cancelled push when a ringing call ends so background isolates stop ringing', async () => {
+    const { service, push } = setup();
+    const { call } = await service.startForRide(actor(CUSTOMER), RIDE);
+    push.send.mockClear();
+    await service.end(actor(CUSTOMER), call.id);
+    expect(push.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: DRIVER,
+        androidDataOnly: true,
+        urgent: true,
+        skipPlatforms: ['ios', 'web'],
+        data: expect.objectContaining({
+          eventType: 'Call.cancelled',
+          callId: call.id,
+        }),
+      }),
+    );
+    service.onModuleDestroy();
+  });
 });

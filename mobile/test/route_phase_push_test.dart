@@ -92,6 +92,16 @@ void main() {
         ),
         isEmpty,
       );
+      // When approach seed has no road polyline, falls back to trip.
+      expect(
+        serverPhasePolyline(
+          approach: true,
+          pushed: null,
+          approachSeed: _geo(const [], available: false),
+          trip: trip,
+        ).first.lat,
+        1,
+      );
     });
   });
 }

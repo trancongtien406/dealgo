@@ -84,51 +84,24 @@ class _MenuSearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final textTheme = Theme.of(context).textTheme;
-    final border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(DealGoRadius.button),
-      borderSide: BorderSide(color: DealGoColors.border),
-    );
-    return TextField(
-      key: const Key('food-store-search'),
+    return DealGoTextField(
+      fieldKey: const Key('food-store-search'),
       controller: controller,
+      showLabel: false,
+      label: l10n.foodStoreSearchMenu,
+      hint: l10n.foodStoreSearchMenu,
+      prefixIcon: DealGoIcons.search,
       textInputAction: TextInputAction.search,
-      style: textTheme.bodyMedium,
-      decoration: InputDecoration(
-        hintText: l10n.foodStoreSearchMenu,
-        hintStyle: textTheme.bodySmall?.copyWith(
-          color: DealGoColors.textSecondary,
-        ),
-        prefixIcon: const Icon(
-          DealGoIcons.search,
-          size: 18,
-          color: DealGoColors.primary,
-        ),
-        prefixIconConstraints: const BoxConstraints(
-          minWidth: 38,
-          minHeight: 38,
-        ),
-        suffixIcon: controller.text.isEmpty
-            ? null
+      suffix: ListenableBuilder(
+        listenable: controller,
+        builder: (context, _) => controller.text.isEmpty
+            ? const SizedBox.shrink()
             : IconButton(
                 key: const Key('food-store-search-clear'),
                 tooltip: MaterialLocalizations.of(context).deleteButtonTooltip,
                 onPressed: controller.clear,
-                icon: const Icon(DealGoIcons.close, size: 16),
+                icon: const Icon(DealGoIcons.close, size: 18),
               ),
-        suffixIconConstraints: const BoxConstraints(
-          minWidth: 38,
-          minHeight: 38,
-        ),
-        filled: true,
-        fillColor: DealGoColors.card,
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(vertical: 11),
-        border: border,
-        enabledBorder: border,
-        focusedBorder: border.copyWith(
-          borderSide: const BorderSide(color: DealGoColors.primary),
-        ),
       ),
     );
   }

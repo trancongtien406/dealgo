@@ -305,6 +305,8 @@ class DealGoDependencies {
       _locator<VerifyPhoneChallenge>();
   AuthMethodsStore get authMethods => _locator<AuthMethodsStore>();
   FoodCategoriesStore get foodCategories => _locator<FoodCategoriesStore>();
+  AccountSettingsRepository get accountSettings =>
+      _locator<AccountSettingsRepository>();
 
   /// Composition root: builds an isolated GetIt graph and mirrors it to [getIt].
   static DealGoDependencies create({

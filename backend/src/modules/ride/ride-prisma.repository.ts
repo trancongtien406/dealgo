@@ -49,7 +49,12 @@ import {
   type UpdateStopsInput,
   type WithdrawOfferInput,
 } from './ride-ledger.js';
-import type { OpsInterveneResult, OpsRidePage, RideCreateHook, RideRepository } from './ride.repository.js';
+import type {
+  OpsInterveneResult,
+  OpsRidePage,
+  RideCreateHook,
+  RideRepository,
+} from './ride.repository.js';
 
 type RideTx = Prisma.TransactionClient;
 export { lockDriverAssignment };
@@ -64,15 +69,23 @@ class RideAssignmentConflict extends Error {
 export class PrismaRideRepository implements RideRepository {
   constructor(private readonly db: PrismaClient) {}
 
-  async create(input: CreateRideInput, withinCreate?: RideCreateHook): Promise<RideSnapshot> {
+  async create(
+    input: CreateRideInput,
+    withinCreate?: RideCreateHook,
+  ): Promise<RideSnapshot> {
     let outcome: Awaited<ReturnType<RideLedger['create']>>;
     try {
       outcome = await this.db.$transaction(async (tx) => {
-        const ledger = await this.hydrateCustomer(tx, input.customerId, input.idempotencyKey);
+        const ledger = await this.hydrateCustomer(
+          tx,
+          input.customerId,
+          input.idempotencyKey,
+        );
         const created = ledger.create(input);
         await this.persist(tx, ledger);
         // DEC-PROD-071: parcel row commits with the ride (no window without it).
-        if (withinCreate && created.ride) await withinCreate({ tx, rideId: created.ride.id });
+        if (withinCreate && created.ride)
+          await withinCreate({ tx, rideId: created.ride.id });
         return created;
       });
     } catch (error) {
@@ -95,7 +108,11 @@ export class PrismaRideRepository implements RideRepository {
     return outcome.ride;
   }
 
-  async findById(id: string, now: Date, attempt = 0): Promise<RideSnapshot | null> {
+  async findById(
+    id: string,
+    now: Date,
+    attempt = 0,
+  ): Promise<RideSnapshot | null> {
     const result = await this.db.$transaction(async (tx) => {
       const ledger = await this.hydrateRide(tx, id);
       if (!ledger) {
@@ -118,7 +135,9 @@ export class PrismaRideRepository implements RideRepository {
     area?: GeoBox,
   ): Promise<OpenRideListing[]> {
     const take =
-      limit !== undefined && Number.isSafeInteger(limit) && limit > 0 ? limit : undefined;
+      limit !== undefined && Number.isSafeInteger(limit) && limit > 0
+        ? limit
+        : undefined;
     const rides = await this.db.ride.findMany({
       where: {
         status: 'NEGOTIATING',
@@ -148,7 +167,10 @@ export class PrismaRideRepository implements RideRepository {
         expiresAt: true,
         routeVersion: true,
         routeDistanceKm: true,
-        stops: { orderBy: { seq: 'asc' }, select: { lat: true, lng: true, label: true } },
+        stops: {
+          orderBy: { seq: 'asc' },
+          select: { lat: true, lng: true, label: true },
+        },
         _count: { select: { offers: true } },
       },
     });
@@ -156,8 +178,16 @@ export class PrismaRideRepository implements RideRepository {
       id: ride.id,
       customerId: ride.customerId,
       status: 'NEGOTIATING',
-      pickup: { lat: ride.pickupLat, lng: ride.pickupLng, label: ride.pickupLabel },
-      dropoff: { lat: ride.dropoffLat, lng: ride.dropoffLng, label: ride.dropoffLabel },
+      pickup: {
+        lat: ride.pickupLat,
+        lng: ride.pickupLng,
+        label: ride.pickupLabel,
+      },
+      dropoff: {
+        lat: ride.dropoffLat,
+        lng: ride.dropoffLng,
+        label: ride.dropoffLabel,
+      },
       offeredFareVnd: ride.offeredFareVnd,
       referenceFareVnd: ride.referenceFareVnd,
       vehicleClassCode: ride.vehicleClassCode,
@@ -169,13 +199,56 @@ export class PrismaRideRepository implements RideRepository {
     }));
   }
 
+  async dismissRequest(
+    rideId: string,
+    driverId: string,
+    dismissedAt: Date,
+  ): Promise<void> {
+    await this.db.rideRequestDismissal.upsert({
+      where: { rideId_driverId: { rideId, driverId } },
+      create: { rideId, driverId, dismissedAt },
+      update: {},
+    });
+  }
+
+  async dismissedRequestIds(
+    driverId: string,
+    rideIds: readonly string[],
+  ): Promise<Set<string>> {
+    if (rideIds.length === 0) return new Set();
+    const rows = await this.db.rideRequestDismissal.findMany({
+      where: { driverId, rideId: { in: [...rideIds] } },
+      select: { rideId: true },
+    });
+    return new Set(rows.map((row) => row.rideId));
+  }
+
+  async undismissedDriverIds(
+    rideId: string,
+    driverIds: readonly string[],
+  ): Promise<string[]> {
+    if (driverIds.length === 0) return [];
+    const rows = await this.db.rideRequestDismissal.findMany({
+      where: { rideId, driverId: { in: [...driverIds] } },
+      select: { driverId: true },
+    });
+    const dismissed = new Set(rows.map((row) => row.driverId));
+    return driverIds.filter((driverId) => !dismissed.has(driverId));
+  }
+
   async setRouteDistanceKm(rideId: string, km: number): Promise<void> {
     if (!Number.isFinite(km) || km < 0) return;
-    await this.db.ride.updateMany({ where: { id: rideId }, data: { routeDistanceKm: Math.round(km * 100) / 100 } });
+    await this.db.ride.updateMany({
+      where: { id: rideId },
+      data: { routeDistanceKm: Math.round(km * 100) / 100 },
+    });
   }
 
   async routeDistanceKm(rideId: string): Promise<number | null> {
-    const row = await this.db.ride.findUnique({ where: { id: rideId }, select: { routeDistanceKm: true } });
+    const row = await this.db.ride.findUnique({
+      where: { id: rideId },
+      select: { routeDistanceKm: true },
+    });
     return row?.routeDistanceKm ?? null;
   }
 
@@ -220,7 +293,11 @@ export class PrismaRideRepository implements RideRepository {
             where: { id: input.offerId },
             select: { id: true, rideId: true, driverId: true, status: true },
           });
-          if (offer && offer.rideId === input.rideId && offer.status === 'PENDING') {
+          if (
+            offer &&
+            offer.rideId === input.rideId &&
+            offer.status === 'PENDING'
+          ) {
             // Serialize every assignment of this driver (ride select + food claim) so
             // two customers cannot both pass the capacity count at the same time.
             await lockDriverAssignment(tx, offer.driverId);
@@ -230,7 +307,12 @@ export class PrismaRideRepository implements RideRepository {
                 where: {
                   assignedDriverId: offer.driverId,
                   status: {
-                    in: ['ASSIGNED', 'DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_TRIP'],
+                    in: [
+                      'ASSIGNED',
+                      'DRIVER_EN_ROUTE',
+                      'DRIVER_ARRIVED',
+                      'IN_TRIP',
+                    ],
                   },
                 },
               }),
@@ -252,7 +334,12 @@ export class PrismaRideRepository implements RideRepository {
         // DEC-PROD-024: the voucher is reserved in the selection transaction, on the agreed
         // fare; a rejection rolls the selection back. Replays (prior selection) never redeem.
         const voucherCode = input.voucherCode?.trim();
-        if (!priorSelection && voucherCode && selected.ride && !selected.error) {
+        if (
+          !priorSelection &&
+          voucherCode &&
+          selected.ride &&
+          !selected.error
+        ) {
           const agreed = selected.ride.agreedFareVnd ?? 0;
           const redeemed = await redeemVoucherInTx(
             tx,
@@ -281,7 +368,11 @@ export class PrismaRideRepository implements RideRepository {
         const winner = selected.ride?.assignedDriverId;
         if (!priorSelection && winner && !selected.error) {
           const others = await tx.rideOffer.findMany({
-            where: { driverId: winner, status: 'PENDING', rideId: { not: input.rideId } },
+            where: {
+              driverId: winner,
+              status: 'PENDING',
+              rideId: { not: input.rideId },
+            },
             select: { id: true, rideId: true },
           });
           if (others.length > 0) {
@@ -295,8 +386,10 @@ export class PrismaRideRepository implements RideRepository {
         return selected;
       });
     } catch (error) {
-      const conflict = error instanceof RideAssignmentConflict || isUniqueConflict(error);
-      const rule = error instanceof RideRuleError || error instanceof VoucherRejectedError;
+      const conflict =
+        error instanceof RideAssignmentConflict || isUniqueConflict(error);
+      const rule =
+        error instanceof RideRuleError || error instanceof VoucherRejectedError;
       if (!conflict && !rule) {
         throw error;
       }
@@ -324,7 +417,9 @@ export class PrismaRideRepository implements RideRepository {
     return outcome.ride;
   }
 
-  private async selectionReplay(input: SelectInput): Promise<RideSnapshot | null> {
+  private async selectionReplay(
+    input: SelectInput,
+  ): Promise<RideSnapshot | null> {
     const prior = await this.db.rideSelection.findUnique({
       where: {
         customerId_idempotencyKey: {
@@ -352,7 +447,11 @@ export class PrismaRideRepository implements RideRepository {
         await this.persist(tx, ledger);
         if (cancelled.ride && !cancelled.error) {
           // Idempotent: a ride without a voucher has nothing to release.
-          await releaseVoucherInTx(tx, { entityType: 'RIDE', entityId: input.rideId }, input.now);
+          await releaseVoucherInTx(
+            tx,
+            { entityType: 'RIDE', entityId: input.rideId },
+            input.now,
+          );
         }
         return cancelled;
       });
@@ -373,8 +472,13 @@ export class PrismaRideRepository implements RideRepository {
     actorUserId: string,
     reason: string,
   ): Promise<OpsInterveneResult> {
-    return this.opsIntervene(input.rideId, input.now, actorUserId, reason, 'CANCEL', (ledger) =>
-      ledger.opsCancel(input),
+    return this.opsIntervene(
+      input.rideId,
+      input.now,
+      actorUserId,
+      reason,
+      'CANCEL',
+      (ledger) => ledger.opsCancel(input),
     );
   }
 
@@ -383,8 +487,13 @@ export class PrismaRideRepository implements RideRepository {
     actorUserId: string,
     reason: string,
   ): Promise<OpsInterveneResult> {
-    return this.opsIntervene(input.rideId, input.now, actorUserId, reason, 'REASSIGN', (ledger) =>
-      ledger.opsReassign(input),
+    return this.opsIntervene(
+      input.rideId,
+      input.now,
+      actorUserId,
+      reason,
+      'REASSIGN',
+      (ledger) => ledger.opsReassign(input),
     );
   }
 
@@ -412,7 +521,8 @@ export class PrismaRideRepository implements RideRepository {
     return this.driverLifecycle(
       input,
       (ledger) => ledger.arriveStop(input),
-      (tx, ride) => this.stopOutbox(tx as RideTx, ride.id, input.seq, 'ARRIVED'),
+      (tx, ride) =>
+        this.stopOutbox(tx as RideTx, ride.id, input.seq, 'ARRIVED'),
     );
   }
 
@@ -420,7 +530,8 @@ export class PrismaRideRepository implements RideRepository {
     return this.driverLifecycle(
       input,
       (ledger) => ledger.departStop(input),
-      (tx, ride) => this.stopOutbox(tx as RideTx, ride.id, input.seq, 'DEPARTED'),
+      (tx, ride) =>
+        this.stopOutbox(tx as RideTx, ride.id, input.seq, 'DEPARTED'),
     );
   }
 
@@ -448,13 +559,17 @@ export class PrismaRideRepository implements RideRepository {
     if (policy.assignedTimeoutMinutes > 0) {
       or.push({
         status: 'ASSIGNED',
-        statusChangedAt: { lte: new Date(now.getTime() - policy.assignedTimeoutMinutes * 60_000) },
+        statusChangedAt: {
+          lte: new Date(now.getTime() - policy.assignedTimeoutMinutes * 60_000),
+        },
       });
     }
     if (policy.enRouteTimeoutMinutes > 0) {
       or.push({
         status: 'DRIVER_EN_ROUTE',
-        statusChangedAt: { lte: new Date(now.getTime() - policy.enRouteTimeoutMinutes * 60_000) },
+        statusChangedAt: {
+          lte: new Date(now.getTime() - policy.enRouteTimeoutMinutes * 60_000),
+        },
       });
     }
     if (or.length === 0) {
@@ -517,7 +632,11 @@ export class PrismaRideRepository implements RideRepository {
         }
         await this.persist(tx, ledger);
         if (options.releaseVoucherAt) {
-          await releaseVoucherInTx(tx, { entityType: 'RIDE', entityId: rideId }, options.releaseVoucherAt);
+          await releaseVoucherInTx(
+            tx,
+            { entityType: 'RIDE', entityId: rideId },
+            options.releaseVoucherAt,
+          );
         }
         return next;
       });
@@ -537,7 +656,12 @@ export class PrismaRideRepository implements RideRepository {
     page: number,
     limit: number,
     now: Date,
-    filter?: { status?: string; q?: string; zone?: string; serviceType?: string },
+    filter?: {
+      status?: string;
+      q?: string;
+      zone?: string;
+      serviceType?: string;
+    },
   ): Promise<OpsRidePage> {
     // serviceType is not a Ride column; intentionally ignored (no fake filter).
     const where: any = {};
@@ -555,7 +679,10 @@ export class PrismaRideRepository implements RideRepository {
     }
     if (filter?.q && filter.q.trim()) {
       const q = filter.q.trim();
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(q);
+      const isUuid =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          q,
+        );
       const orConditions: any[] = [
         { pickupLabel: { contains: q, mode: 'insensitive' } },
         { dropoffLabel: { contains: q, mode: 'insensitive' } },
@@ -643,8 +770,12 @@ export class PrismaRideRepository implements RideRepository {
     for (const row of rows) {
       if (!row.assignedDriverId) continue;
       // DEC-PROD-035: only driver cancellations count against the driver.
-      if (!cancellationCountsAgainstDriver(row.status, row.cancelledBy)) continue;
-      const current = counts.get(row.assignedDriverId) ?? { completed: 0, finished: 0 };
+      if (!cancellationCountsAgainstDriver(row.status, row.cancelledBy))
+        continue;
+      const current = counts.get(row.assignedDriverId) ?? {
+        completed: 0,
+        finished: 0,
+      };
       current.finished += row._count._all;
       if (row.status === 'COMPLETED') {
         current.completed += row._count._all;
@@ -654,7 +785,11 @@ export class PrismaRideRepository implements RideRepository {
     // Rides the driver dropped after assignment (self-cancel / timeout) count as finished.
     const dropped = await this.db.driverJobCancellation.groupBy({
       by: ['driverId'],
-      where: { driverId: { in: [...driverIds] }, entityType: 'RIDE', actor: { in: ['DRIVER', 'SYSTEM'] } },
+      where: {
+        driverId: { in: [...driverIds] },
+        entityType: 'RIDE',
+        actor: { in: ['DRIVER', 'SYSTEM'] },
+      },
       _count: { _all: true },
     });
     for (const row of dropped) {
@@ -665,9 +800,15 @@ export class PrismaRideRepository implements RideRepository {
     return counts;
   }
 
-  async listIdsForDriverInStatuses(driverId: string, statuses: readonly string[]): Promise<string[]> {
+  async listIdsForDriverInStatuses(
+    driverId: string,
+    statuses: readonly string[],
+  ): Promise<string[]> {
     const rows = await this.db.ride.findMany({
-      where: { assignedDriverId: driverId, status: { in: [...statuses] as never } },
+      where: {
+        assignedDriverId: driverId,
+        status: { in: [...statuses] as never },
+      },
       select: { id: true },
     });
     return rows.map((row) => row.id);
@@ -686,10 +827,15 @@ export class PrismaRideRepository implements RideRepository {
       orderBy: { statusChangedAt: 'desc' },
       take: 50,
     });
-    return rows.flatMap((row) => (row.statusChangedAt ? [row.statusChangedAt] : []));
+    return rows.flatMap((row) =>
+      row.statusChangedAt ? [row.statusChangedAt] : [],
+    );
   }
 
-  async listIdsForCustomerInStatuses(customerId: string, statuses: readonly string[]): Promise<string[]> {
+  async listIdsForCustomerInStatuses(
+    customerId: string,
+    statuses: readonly string[],
+  ): Promise<string[]> {
     const rows = await this.db.ride.findMany({
       where: { customerId, status: { in: [...statuses] as never } },
       orderBy: { createdAt: 'desc' },
@@ -733,7 +879,11 @@ export class PrismaRideRepository implements RideRepository {
     action: 'CANCEL' | 'REASSIGN',
     apply: (ledger: RideLedger) => Awaited<ReturnType<RideLedger['opsCancel']>>,
   ): Promise<OpsInterveneResult> {
-    let result: { ride?: RideSnapshot; error?: RideRuleError['code']; auditId?: string };
+    let result: {
+      ride?: RideSnapshot;
+      error?: RideRuleError['code'];
+      auditId?: string;
+    };
     try {
       result = await this.db.$transaction(async (tx) => {
         const ledger = await this.hydrateRide(tx, rideId);
@@ -746,7 +896,11 @@ export class PrismaRideRepository implements RideRepository {
         }
         await this.persist(tx, ledger);
         // Cancel and reassign both return the reserved voucher (reassign clears the snapshot).
-        await releaseVoucherInTx(tx, { entityType: 'RIDE', entityId: rideId }, now);
+        await releaseVoucherInTx(
+          tx,
+          { entityType: 'RIDE', entityId: rideId },
+          now,
+        );
         const auditId = randomUUID();
         await tx.opsAuditLog.create({
           data: {
@@ -805,7 +959,12 @@ export class PrismaRideRepository implements RideRepository {
     input: DriverLifecycleInput,
     onCompleted?: CompletionHook<RideSnapshot>,
   ): Promise<RideSnapshot> {
-    return this.driverLifecycle(input, (ledger) => ledger.complete(input), onCompleted, true);
+    return this.driverLifecycle(
+      input,
+      (ledger) => ledger.complete(input),
+      onCompleted,
+      true,
+    );
   }
 
   async expireDue(now: Date, limit = 100): Promise<string[]> {
@@ -827,7 +986,10 @@ export class PrismaRideRepository implements RideRepository {
         if (updated.count !== 1) {
           return false;
         }
-        await tx.ride.update({ where: { id: row.id }, data: { statusChangedAt: now } });
+        await tx.ride.update({
+          where: { id: row.id },
+          data: { statusChangedAt: now },
+        });
         // Live offers die with the ride.
         await tx.rideOffer.updateMany({
           where: { rideId: row.id, status: 'PENDING' },
@@ -869,7 +1031,9 @@ export class PrismaRideRepository implements RideRepository {
 
   private async driverLifecycle(
     input: DriverLifecycleInput,
-    apply: (ledger: RideLedger) => Awaited<ReturnType<RideLedger['markEnRoute']>>,
+    apply: (
+      ledger: RideLedger,
+    ) => Awaited<ReturnType<RideLedger['markEnRoute']>>,
     onChanged?: CompletionHook<RideSnapshot>,
     collectFees = false,
   ): Promise<RideSnapshot> {
@@ -884,7 +1048,11 @@ export class PrismaRideRepository implements RideRepository {
         let collected: CustomerFeeRecord[] = [];
         if (collectFees && next.ride && !next.error) {
           // Earlier late-cancel / no-show fees are collected in this ride's cash.
-          collected = await this.lockPendingFees(tx, next.ride.customerId, next.ride.id);
+          collected = await this.lockPendingFees(
+            tx,
+            next.ride.customerId,
+            next.ride.id,
+          );
           if (collected.length > 0) {
             ledger.collectFees(next.ride.id, collected, input.now);
             const reread = ledger.read(next.ride.id, input.now);
@@ -905,8 +1073,15 @@ export class PrismaRideRepository implements RideRepository {
         await this.persist(tx, ledger);
         if (collected.length > 0) {
           await tx.customerFeeCharge.updateMany({
-            where: { id: { in: collected.map((fee) => fee.id) }, status: 'PENDING' },
-            data: { status: 'COLLECTED', collectedRideId: input.rideId, collectedAt: input.now },
+            where: {
+              id: { in: collected.map((fee) => fee.id) },
+              status: 'PENDING',
+            },
+            data: {
+              status: 'COLLECTED',
+              collectedRideId: input.rideId,
+              collectedAt: input.now,
+            },
           });
         }
         if (next.ride && !next.error && onChanged) {
@@ -990,9 +1165,15 @@ export class PrismaRideRepository implements RideRepository {
     return this.ledgerFrom(rides, []);
   }
 
-  private async hydrateRide(tx: RideTx, rideId: string): Promise<RideLedger | null> {
+  private async hydrateRide(
+    tx: RideTx,
+    rideId: string,
+  ): Promise<RideLedger | null> {
     await this.lockRides(tx, [rideId]);
-    const ride = await tx.ride.findUnique({ where: { id: rideId }, include: { offers: true, stops: { orderBy: { seq: 'asc' } } } });
+    const ride = await tx.ride.findUnique({
+      where: { id: rideId },
+      include: { offers: true, stops: { orderBy: { seq: 'asc' } } },
+    });
     if (!ride) {
       return null;
     }
@@ -1184,10 +1365,17 @@ export class PrismaRideRepository implements RideRepository {
     let stale = false;
     const updates = changes.rides.filter((ride) => !ride.isNew);
     const inserts = changes.rides.filter((ride) => ride.isNew);
-    const statusEvents: Array<{ id: string; status: RideStatusName; keySuffix?: string }> = [];
+    const statusEvents: Array<{
+      id: string;
+      status: RideStatusName;
+      keySuffix?: string;
+    }> = [];
 
     for (const change of updates) {
-      if (change.loadedStatus !== null && change.loadedStatus !== change.row.status) {
+      if (
+        change.loadedStatus !== null &&
+        change.loadedStatus !== change.row.status
+      ) {
         const claimed = await tx.ride.updateMany({
           where: { id: change.row.id, status: change.loadedStatus },
           data: ridePatch(change.row),
@@ -1207,14 +1395,19 @@ export class PrismaRideRepository implements RideRepository {
           statusEvents.push({
             id: change.row.id,
             status: change.row.status,
-            keySuffix: PRE_TRIP_STATUSES.has(change.row.status) && change.row.assignedDriverId
-              ? `${change.row.assignedDriverId}@${change.row.statusChangedAt.getTime()}`
-              : undefined,
+            keySuffix:
+              PRE_TRIP_STATUSES.has(change.row.status) &&
+              change.row.assignedDriverId
+                ? `${change.row.assignedDriverId}@${change.row.statusChangedAt.getTime()}`
+                : undefined,
           });
         }
         continue;
       }
-      await tx.ride.update({ where: { id: change.row.id }, data: ridePatch(change.row) });
+      await tx.ride.update({
+        where: { id: change.row.id },
+        data: ridePatch(change.row),
+      });
     }
 
     for (const change of changes.offers) {
@@ -1318,7 +1511,11 @@ export class PrismaRideRepository implements RideRepository {
 }
 
 /** A ride can come back to these after a drop; their outbox keys carry driver + time. */
-const PRE_TRIP_STATUSES = new Set<RideStatusName>(['ASSIGNED', 'DRIVER_EN_ROUTE', 'DRIVER_ARRIVED']);
+const PRE_TRIP_STATUSES = new Set<RideStatusName>([
+  'ASSIGNED',
+  'DRIVER_EN_ROUTE',
+  'DRIVER_ARRIVED',
+]);
 
 function rideData(row: {
   id: string;
@@ -1459,7 +1656,9 @@ function offerData(row: {
   return row;
 }
 
-
 function isUniqueConflict(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002'
+  );
 }

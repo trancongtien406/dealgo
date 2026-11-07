@@ -1,0 +1,65 @@
+<svg width="260" height="340" viewBox="0 0 260 340" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="bodyCyberPickup" x1="40" y1="40" x2="220" y2="240" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1E1B4B"/>
+      <stop offset="50%" stop-color="#2E1065"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="neonEmeraldGrad" x1="60" y1="40" x2="200" y2="240" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#34D399"/>
+      <stop offset="50%" stop-color="#10B981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <radialGradient id="radarGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#10B981" stop-opacity="0.8"/>
+      <stop offset="40%" stop-color="#10B981" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#10B981" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="cyberGlow" x="0" y="0" width="260" height="340" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#10B981" flood-opacity="0.4"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+
+  <!-- Ground Radar Rings (Sóng quét Radar mặt đường) -->
+  <g opacity="0.95">
+    <ellipse cx="130" cy="305" rx="90" ry="24" stroke="#10B981" stroke-width="1.5" stroke-dasharray="8 6" opacity="0.4"/>
+    <ellipse cx="130" cy="305" rx="60" ry="16" fill="url(#radarGlow)" stroke="#34D399" stroke-width="2" opacity="0.7"/>
+    <ellipse cx="130" cy="305" rx="20" ry="6" fill="#10B981"/>
+    <ellipse cx="130" cy="305" rx="8" ry="2.5" fill="#FFFFFF"/>
+  </g>
+
+  <!-- Laser Pinpoint Beam -->
+  <polygon points="126,240 134,240 131,305 129,305" fill="#34D399" opacity="0.75"/>
+  <line x1="130" y1="240" x2="130" y2="305" stroke="#FFFFFF" stroke-width="1.5" opacity="0.9"/>
+
+  <!-- Main Floating Dynamic D-Pod -->
+  <g filter="url(#cyberGlow)">
+    <rect x="52" y="32" width="156" height="200" rx="44" fill="#090D1A" stroke="url(#neonEmeraldGrad)" stroke-width="3.5"/>
+    <rect x="58" y="38" width="144" height="188" rx="38" fill="url(#bodyCyberPickup)" fill-opacity="0.9"/>
+    
+    <path d="M72 44H96M164 44H188" stroke="#34D399" stroke-width="3" stroke-linecap="round"/>
+    
+    <!-- Status Pill -->
+    <rect x="74" y="56" width="112" height="26" rx="13" fill="#10B981" fill-opacity="0.2" stroke="#34D399" stroke-width="1.5"/>
+    <circle cx="90" cy="69" r="4" fill="#34D399"/>
+    <circle cx="90" cy="69" r="2" fill="#FFFFFF"/>
+    <text x="132" y="74" text-anchor="middle" fill="#E6FFFA" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="900" letter-spacing="1.5">ĐIỂM ĐÓN</text>
+
+    <!-- Center Radar Core -->
+    <g transform="translate(130, 144)">
+      <circle cx="0" cy="0" r="42" fill="#10B981" fill-opacity="0.1" stroke="#34D399" stroke-width="2" stroke-dasharray="6 4"/>
+      <circle cx="0" cy="0" r="28" fill="#10B981" fill-opacity="0.2" stroke="#34D399" stroke-width="1.5"/>
+      <circle cx="0" cy="0" r="15" fill="url(#neonEmeraldGrad)"/>
+      <circle cx="0" cy="0" r="6" fill="#FFFFFF"/>
+      <line x1="-36" y1="0" x2="-22" y2="0" stroke="#34D399" stroke-width="2"/>
+      <line x1="22" y1="0" x2="36" y2="0" stroke="#34D399" stroke-width="2"/>
+      <line x1="0" y1="-36" x2="0" y2="-22" stroke="#34D399" stroke-width="2"/>
+      <line x1="0" y1="22" x2="0" y2="36" stroke="#34D399" stroke-width="2"/>
+    </g>
+
+    <path d="M124 232L130 244L136 232H124Z" fill="#34D399"/>
+  </g>
+</svg>
+

@@ -117,9 +117,8 @@ class _FeedBody extends StatelessWidget {
                           dish.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: DealGoType.body(
-                            textTheme,
-                          ).copyWith(color: DealGoColors.text),
+                          style: DealGoType.body(textTheme)
+                              .copyWith(color: DealGoColors.text),
                         ),
                       ),
                       const SizedBox(width: DealGoSpacing.s8),

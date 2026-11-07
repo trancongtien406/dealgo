@@ -467,6 +467,9 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
     String? description,
     int? prepMinutes,
     String? menuCategoryId,
+    int? originalPriceVnd,
+    List<MerchantItemImageUpload>? newImages,
+    List<FoodOptionGroup>? optionGroups,
   }) {
     return _send(
       () => dio.post<Object?>(
@@ -478,6 +481,11 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
           'description': ?description,
           'prepMinutes': ?prepMinutes,
           'menuCategoryId': ?menuCategoryId,
+          'originalPriceVnd': ?originalPriceVnd,
+          if (newImages != null && newImages.isNotEmpty)
+            'newImages': [for (final img in newImages) img.toJson()],
+          if (optionGroups != null)
+            'optionGroups': encodeFoodOptionGroups(optionGroups),
         },
         options: _auth(accessToken),
       ),
@@ -493,11 +501,17 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
     int? priceVnd,
     bool? available,
     String? description,
+    bool clearDescription = false,
     int? prepMinutes,
+    bool clearPrepMinutes = false,
     String? imageUrl,
+    List<String>? imageUrls,
+    List<MerchantItemImageUpload>? newImages,
     String? menuCategoryId,
+    bool clearMenuCategoryId = false,
     int? originalPriceVnd,
     bool clearOriginalPrice = false,
+    List<FoodOptionGroup>? optionGroups,
   }) {
     return _send(
       () => dio.patch<Object?>(
@@ -506,18 +520,40 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
           'name': ?name,
           'priceVnd': ?priceVnd,
           'available': ?available,
-          'description': ?description,
-          'prepMinutes': ?prepMinutes,
+          if (clearDescription) 'description': null else 'description': ?description,
+          if (clearPrepMinutes) 'prepMinutes': null else 'prepMinutes': ?prepMinutes,
           'imageUrl': ?imageUrl,
-          'menuCategoryId': ?menuCategoryId,
+          'imageUrls': ?imageUrls,
+          if (newImages != null && newImages.isNotEmpty)
+            'newImages': [for (final img in newImages) img.toJson()],
+          if (clearMenuCategoryId)
+            'menuCategoryId': null
+          else
+            'menuCategoryId': ?menuCategoryId,
           if (clearOriginalPrice)
             'originalPriceVnd': null
           else
             'originalPriceVnd': ?originalPriceVnd,
+          if (optionGroups != null)
+            'optionGroups': encodeFoodOptionGroups(optionGroups),
         },
         options: _auth(accessToken),
       ),
       decodeFoodMenuItem,
+    );
+  }
+
+  @override
+  Future<void> deleteMerchantItem({
+    required String accessToken,
+    required String itemId,
+  }) {
+    return _send<void>(
+      () => dio.delete<Object?>(
+        ApiPaths.foodMerchantItem(itemId),
+        options: _auth(accessToken),
+      ),
+      (_) {},
     );
   }
 
@@ -634,11 +670,20 @@ class DioFoodRemoteDataSource implements FoodRemoteDataSource {
     int limit = 20,
     String? tab,
     String? q,
+    DateTime? from,
+    DateTime? to,
   }) {
     return _send(
       () => dio.get<Object?>(
         ApiPaths.foodMerchantOrdersHistory,
-        queryParameters: {'page': page, 'limit': limit, 'tab': ?tab, 'q': ?q},
+        queryParameters: {
+          'page': page,
+          'limit': limit,
+          'tab': ?tab,
+          'q': ?q,
+          'from': ?from?.toIso8601String(),
+          'to': ?to?.toIso8601String(),
+        },
         options: _auth(accessToken),
       ),
       decodeMerchantHistoryPage,
@@ -902,7 +947,9 @@ MerchantQueueOrder? _queueOrder(Object? raw) {
     lineCount: _asInt(map['itemCount']) ?? lineCount,
     createdAt: createdAt,
     customerName: _nonEmpty(map['customerName']),
+    customerAvatarUrl: _nonEmpty(map['customerAvatarUrl']),
     driverName: _nonEmpty(map['driverName']),
+    driverAvatarUrl: _nonEmpty(map['driverAvatarUrl']),
   );
 }
 
@@ -1512,6 +1559,10 @@ FoodOrderDetail decodeFoodOrderDetail(Object? body) {
     pendingChange: decodeFoodOrderChange(data['pendingChange']),
     note: _asNote(data['note']),
     utensils: data['utensils'] is bool ? data['utensils'] as bool : true,
+    customerName: _nonEmpty(data['customerName']),
+    customerAvatarUrl: _nonEmpty(data['customerAvatarUrl']),
+    driverName: _nonEmpty(data['driverName']),
+    driverAvatarUrl: _nonEmpty(data['driverAvatarUrl']),
   );
 }
 
@@ -1735,6 +1786,7 @@ MerchantHistoryPage decodeMerchantHistoryPage(Object? body) {
           customerName: map['customerName'] is String
               ? map['customerName'] as String
               : null,
+          customerAvatarUrl: _nonEmpty(map['customerAvatarUrl']),
           lineSummary: map['lineSummary'] is String
               ? map['lineSummary'] as String
               : '',

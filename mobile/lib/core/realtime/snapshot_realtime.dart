@@ -206,10 +206,7 @@ PaymentStatusHint? parsePaymentStatusHint(Object? raw) {
 /// `driverCreditStatus` push on a driver's private `user:` room when a prepaid
 /// top-up changes state. The credit page re-GETs REST; the push is only a hint.
 class DriverCreditStatusHint {
-  const DriverCreditStatusHint({
-    required this.topUpId,
-    required this.status,
-  });
+  const DriverCreditStatusHint({required this.topUpId, required this.status});
 
   final String topUpId;
   final String status;

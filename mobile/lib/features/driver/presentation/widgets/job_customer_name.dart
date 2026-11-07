@@ -81,46 +81,54 @@ class _JobCustomerTileState extends State<JobCustomerTile> {
     final avatar = resolveMediaUrl(customer?.avatarUrl);
     final phone = customer?.phone;
     final trailing = widget.trailing;
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        CircleAvatar(
-          key: const Key('job-customer-avatar'),
-          radius: 24,
-          backgroundColor: DealGoColors.subtlePurple,
-          foregroundImage: avatar == null
-              ? null
-              : DealGoImageCache.provider(avatar, decodeWidth: 240),
-          child: const Icon(DealGoIcons.user, color: DealGoColors.primary),
-        ),
-        const SizedBox(width: DealGoSpacing.s12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                name,
-                key: const Key('job-customer-name'),
-                style: textTheme.titleMedium,
-              ),
-              if (subtitle != null)
-                Text(
-                  subtitle,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: DealGoColors.textSecondary,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            CircleAvatar(
+              key: const Key('job-customer-avatar'),
+              radius: 24,
+              backgroundColor: DealGoColors.subtlePurple,
+              foregroundImage: avatar == null
+                  ? null
+                  : DealGoImageCache.provider(avatar, decodeWidth: 240),
+              child: const Icon(DealGoIcons.user, color: DealGoColors.primary),
+            ),
+            const SizedBox(width: DealGoSpacing.s12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    name,
+                    key: const Key('job-customer-name'),
+                    style: textTheme.titleMedium,
                   ),
-                ),
-              if (phone != null) ...[
-                const SizedBox(height: DealGoSpacing.s8),
-                ContactPhoneLine(phone: phone),
-              ],
+                  if (subtitle != null) ...[
+                    const SizedBox(height: DealGoSpacing.s2),
+                    Text(
+                      subtitle,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: DealGoColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (trailing != null) ...[
+              const SizedBox(width: DealGoSpacing.s8),
+              trailing,
             ],
-          ),
+          ],
         ),
-        if (trailing != null) ...[
-          const SizedBox(width: DealGoSpacing.s8),
-          trailing,
+        if (phone != null) ...[
+          const SizedBox(height: DealGoSpacing.s12),
+          ContactPhoneLine(phone: phone, fullWidth: true),
         ],
       ],
     );

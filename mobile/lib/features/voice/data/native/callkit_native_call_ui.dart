@@ -6,6 +6,7 @@ import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/ports/native_call_ui.dart';
+import '../../../../core/auth/token_store.dart';
 
 /// [NativeCallUi] on flutter_callkit_incoming: CallKit on iOS, a self-managed
 /// ConnectionService (Telecom) call with a full-screen incoming UI on Android.
@@ -36,7 +37,7 @@ class CallkitNativeCallUi implements NativeCallUi {
     try {
       final calls = await FlutterCallkitIncoming.activeCalls();
       for (final call in calls) {
-        if (call.id != keepCallId) {
+        if (!_sameCallId(call.id, keepCallId)) {
           await FlutterCallkitIncoming.endCall(call.id);
         }
       }
@@ -118,12 +119,34 @@ class CallkitNativeCallUi implements NativeCallUi {
     }
     try {
       final calls = await FlutterCallkitIncoming.activeCalls();
-      return calls.any((call) => call.id == callId && !call.isAccepted);
+      return calls.any(
+        (call) => _sameCallId(call.id, callId) && !call.isAccepted,
+      );
     } catch (error) {
       debugPrint('callkit activeCalls: $error');
       return false;
     }
   }
+
+  @override
+  Future<List<String>> ringingCalls() async {
+    if (kIsWeb) {
+      return const [];
+    }
+    try {
+      final calls = await FlutterCallkitIncoming.activeCalls();
+      return [
+        for (final call in calls)
+          if (!call.isAccepted && call.id.isNotEmpty) call.id,
+      ];
+    } catch (error) {
+      debugPrint('callkit activeCalls: $error');
+      return const [];
+    }
+  }
+
+  static bool _sameCallId(String? a, String? b) =>
+      a != null && b != null && a.trim().toLowerCase() == b.trim().toLowerCase();
 
   /// Audio-only, Vietnamese labels, ring for the server's ring window.
   static CallKitParams paramsFor(NativeIncomingCall call) => CallKitParams(
@@ -169,6 +192,10 @@ class CallkitNativeCallUi implements NativeCallUi {
       supportsVideo: false,
       maximumCallGroups: 1,
       maximumCallsPerCallGroup: 1,
+      // CallKit activates AVAudioSession and LiveKit configures RTCAudioSession
+      // under externalCallSystem; the plugin's own setActive/1200ms timer would
+      // fight WebRTC and trigger -4100 audio session failures.
+      configureAudioSession: false,
       audioSessionMode: 'voiceChat',
       audioSessionActive: true,
       supportsDTMF: false,
@@ -226,10 +253,21 @@ Future<void> handleCallPushInBackground(
   String? title,
   String? body,
   NativeCallUi? ui,
+  TokenStore? tokenStore,
 }) async {
   if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
     // iOS rings through PushKit → CallKit in AppDelegate instead.
     return;
+  }
+  if (tokenStore != null) {
+    try {
+      final tokens = await tokenStore.read();
+      if (tokens == null || tokens.accessToken.trim().isEmpty) {
+        return;
+      }
+    } catch (_) {
+      return;
+    }
   }
   final native = ui ?? CallkitNativeCallUi();
   // Incoming calls are data-only on Android (no FCM tray copy beside the
@@ -244,7 +282,8 @@ Future<void> handleCallPushInBackground(
     return;
   }
   final callId = data['callId'];
-  if (data['eventType'] == 'Call.missed' && callId is String) {
+  const dismissEvents = {'Call.missed', 'Call.cancelled', 'Call.ended'};
+  if (dismissEvents.contains(data['eventType']) && callId is String) {
     await native.dismiss(callId);
   }
 }

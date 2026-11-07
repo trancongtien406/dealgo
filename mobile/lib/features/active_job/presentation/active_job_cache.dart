@@ -112,6 +112,24 @@ class ActiveJobCache {
     return _writes = _writes.then((_) => _store.clear());
   }
 
+  /// Clears a stale snapshot only when it still points at [id].
+  ///
+  /// A late 404 from an old tracking screen must not erase a newer job that
+  /// has already replaced it in the cache.
+  Future<void> clearIfMatches(String id) async {
+    final user = _userId;
+    if (user == null) return;
+    await _ensureLoaded();
+    final current = _current;
+    if (user != _userId ||
+        current == null ||
+        current.userId != user ||
+        current.snapshot.id != id) {
+      return;
+    }
+    await clear();
+  }
+
   Future<void> _ensureLoaded() => _loaded ??= _store.read().then((value) {
     _current ??= value;
   });

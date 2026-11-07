@@ -1,5 +1,6 @@
 import 'package:dealgo/features/driver/data/datasources/fake_driver_jobs_client.dart';
 import 'package:dealgo/features/driver/data/repositories/driver_jobs_repository_impl.dart';
+import 'package:dealgo/features/driver/domain/repositories/driver_jobs_repository.dart';
 import 'package:dealgo/features/driver/domain/usecases/list_open_driver_rides.dart';
 import 'package:dealgo/features/driver/domain/usecases/list_ready_driver_orders.dart';
 import 'package:dealgo/features/driver/presentation/cubit/driver_feed_cubit.dart';
@@ -58,17 +59,21 @@ void main() {
   Future<void> pump(WidgetTester tester) => tester.pumpWidget(
     RepositoryProvider(
       create: (_) => SubmitDriverRideOffer(DriverJobsRepositoryImpl(client)),
-      child: BlocProvider.value(
-        value: cubit,
-        child: MaterialApp(
-          locale: const Locale('vi'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: IncomingJobAlertHost(
-            ringer: ringer,
-            clock: () => now,
-            inCall: () => false,
-            child: const Scaffold(body: Text('jobs')),
+      child: RepositoryProvider<DriverJobsRepository>(
+        create: (_) => DriverJobsRepositoryImpl(client),
+        child: BlocProvider.value(
+          value: cubit,
+          child: MaterialApp(
+            locale: const Locale('vi'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: IncomingJobAlertHost(
+              ringer: ringer,
+              clock: () => now,
+              inCall: () => false,
+              accessToken: () => 't',
+              child: const Scaffold(body: Text('jobs')),
+            ),
           ),
         ),
       ),
@@ -94,9 +99,11 @@ void main() {
     expect(find.text('1:20'), findsOneWidget);
     expect(ringer.ringing, isTrue, reason: 'keeps ringing, not a brief beep');
     await tester.tap(find.byKey(const Key('incoming-job-skip')));
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
     await tester.pump();
     expect(find.byKey(const Key('incoming-job-alert')), findsNothing);
     expect(ringer.ringing, isFalse);
+    expect(client.dismissCalls, ['r1']);
     // Same job on the next refresh does not ring again.
     await feed(tester, [_ride('r1', expiresIn: 90)]);
     expect(find.byKey(const Key('incoming-job-alert')), findsNothing);

@@ -20,6 +20,7 @@ import '../../onboarding/presentation/cubit/driver_kyc_cubit.dart';
 import '../../onboarding/presentation/utils/driver_kyc_routes.dart';
 import '../../onboarding/presentation/cubit/merchant_kyb_cubit.dart';
 import '../../onboarding/presentation/utils/merchant_kyb_routes.dart';
+import '../../driver/presentation/utils/driver_routes.dart';
 import '../../merchant/presentation/utils/merchant_routes.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../legal/legal_document_page.dart';
@@ -57,11 +58,13 @@ class AccountPage extends StatelessWidget {
     );
     final canSwitchRole =
         signedIn != null && signedIn.profile.activeAppRoles.length > 1;
-    final roleLabel = accountShellRoleLabel(
-      AppLocalizations.of(context),
-      shellPath,
-    );
+    final l10n = AppLocalizations.of(context);
+    final roleLabel = accountShellRoleLabel(l10n, shellPath);
     final textTheme = Theme.of(context).textTheme;
+    final appearance = context.watch<AppAppearance>();
+    final isDriver = shellPath.startsWith('/driver');
+    final isMerchant = shellPath.startsWith('/merchant');
+    final isCustomer = !isDriver && !isMerchant;
 
     return ColoredBox(
       color: DealGoColors.canvas,
@@ -115,7 +118,7 @@ class AccountPage extends StatelessWidget {
                           : null,
                     ),
                     const SizedBox(height: DealGoSpacing.s12),
-                    if (shellPath.startsWith('/driver')) ...[
+                    if (isDriver) ...[
                       const DriverAccountVehicle(),
                       const SizedBox(height: DealGoSpacing.s12),
                       _MenuGroup(
@@ -124,7 +127,7 @@ class AccountPage extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: DealGoSpacing.s12),
-                    ] else if (shellPath.startsWith('/merchant')) ...[
+                    ] else if (isMerchant) ...[
                       _MenuGroup(
                         children: [
                           _merchantOnboardingRow(context, signedIn?.profile),
@@ -135,100 +138,153 @@ class AccountPage extends StatelessWidget {
                       _CustomerPartnerHubCard(profile: signedIn.profile),
                       const SizedBox(height: DealGoSpacing.s12),
                     ],
-                    _MenuGroup(
-                      children: [
-                        _MenuRow(
-                          icon: DealGoIcons.gift,
-                          title: AppLocalizations.of(context).accountVouchers,
-                          subtitle: AppLocalizations.of(context)
-                              .accountVouchersBody,
-                          trailing: _LinkLabel(
-                            AppLocalizations.of(context).actionSeeAll,
+                    if (isCustomer) ...[
+                      _MenuGroup(
+                        children: [
+                          _MenuRow(
+                            icon: DealGoIcons.gift,
+                            iconBackground: DealGoColors.amberSurface,
+                            iconColor: DealGoColors.amber,
+                            title: l10n.accountVouchers,
+                            subtitle: l10n.accountVouchersBody,
+                            trailing: _LinkLabel(l10n.actionSeeAll),
+                            showChevron: false,
+                            onTap: () =>
+                                context.push(AccountRoutes.vouchers(shellPath)),
                           ),
-                          showChevron: false,
-                          onTap: () =>
-                              context.push(AccountRoutes.vouchers(shellPath)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: DealGoSpacing.s20),
+                        ],
+                      ),
+                      const SizedBox(height: DealGoSpacing.s20),
+                    ],
                     Text(
-                      AppLocalizations.of(context).accountSectionServices,
+                      l10n.accountSectionServices,
                       style: textTheme.titleMedium,
                     ),
                     const SizedBox(height: DealGoSpacing.s12),
-                    _MenuGroup(
-                      children: [
-                        _MenuRow(
-                          icon: DealGoIcons.list,
-                          title: AppLocalizations.of(context).accountActivity,
-                          subtitle: AppLocalizations.of(context)
-                              .accountActivityBody,
-                          onTap: () => context.go(_activityPath(shellPath)),
-                        ),
-                        _MenuRow(
-                          icon: DealGoIcons.pin,
-                          title: AppLocalizations.of(context).accountAddresses,
-                          subtitle: AppLocalizations.of(context)
-                              .accountAddressesBody,
-                          onTap: () =>
-                              context.push(AccountRoutes.addresses(shellPath)),
-                        ),
-                        _MenuRow(
-                          icon: DealGoIcons.card,
-                          title: AppLocalizations.of(context).accountPayments,
-                          subtitle: AppLocalizations.of(context)
-                              .accountPaymentsBody,
-                          onTap: () =>
-                              context.push(AccountRoutes.payments(shellPath)),
-                        ),
-                        if (shellPath.startsWith('/merchant')) ...[
+                    if (isCustomer) ...[
+                      _MenuGroup(
+                        children: [
+                          _MenuRow(
+                            icon: DealGoIcons.list,
+                            title: l10n.accountActivity,
+                            subtitle: l10n.accountActivityBody,
+                            onTap: () => context.go(_activityPath(shellPath)),
+                          ),
+                          _MenuRow(
+                            icon: DealGoIcons.pin,
+                            title: l10n.accountAddresses,
+                            subtitle: l10n.accountAddressesBody,
+                            onTap: () => context.push(
+                              AccountRoutes.addresses(shellPath),
+                            ),
+                          ),
+                          _MenuRow(
+                            icon: DealGoIcons.card,
+                            title: l10n.accountPayments,
+                            subtitle: l10n.accountPaymentsBody,
+                            onTap: () => context.push(
+                              AccountRoutes.payments(shellPath),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else if (isDriver) ...[
+                      _MenuGroup(
+                        children: [
+                          _MenuRow(
+                            icon: DealGoIcons.cash,
+                            iconBackground: DealGoColors.greenSurface,
+                            iconColor: DealGoColors.brandGreen,
+                            title: l10n.driverCreditTitle,
+                            subtitle: l10n.driverCreditCardBody,
+                            onTap: () => context.push(DriverRoutes.credit),
+                          ),
+                          _MenuRow(
+                            icon: DealGoIcons.tune,
+                            iconBackground: DealGoColors.subtlePurple,
+                            iconColor: DealGoColors.primary,
+                            title: l10n.driverServicesTitle,
+                            subtitle: l10n.driverServicesHeadline,
+                            onTap: () => context.push(DriverRoutes.services),
+                          ),
+                          _MenuRow(
+                            icon: DealGoIcons.list,
+                            title: l10n.accountActivity,
+                            subtitle: l10n.accountActivityBody,
+                            onTap: () => context.go(_activityPath(shellPath)),
+                          ),
+                        ],
+                      ),
+                    ] else if (isMerchant) ...[
+                      _MenuGroup(
+                        children: [
                           _MenuRow(
                             icon: DealGoIcons.filter,
-                            title: AppLocalizations.of(context)
-                                .accountAcceptMode,
-                            subtitle: AppLocalizations.of(context)
-                                .accountAcceptModeBody,
+                            title: l10n.accountAcceptMode,
+                            subtitle: l10n.accountAcceptModeBody,
                             onTap: () =>
                                 context.push(MerchantRoutes.acceptSettings),
                           ),
                           _MenuRow(
                             icon: DealGoIcons.clock,
-                            title: AppLocalizations.of(context).accountHours,
-                            subtitle: AppLocalizations.of(context)
-                                .accountHoursBody,
+                            title: l10n.accountHours,
+                            subtitle: l10n.accountHoursBody,
                             onTap: () => context.push(MerchantRoutes.hours),
                           ),
                           _MenuRow(
                             key: const Key('account-store-profile'),
                             icon: DealGoIcons.restaurant,
-                            title: AppLocalizations.of(context)
-                                .merchantProfileTitle,
-                            subtitle: AppLocalizations.of(context)
-                                .accountStoreProfileBody,
+                            title: l10n.merchantProfileTitle,
+                            subtitle: l10n.accountStoreProfileBody,
                             onTap: () => context.push(MerchantRoutes.profile),
                           ),
                           _MenuRow(
                             icon: DealGoIcons.pin,
-                            title: AppLocalizations.of(context)
-                                .merchantLocationTitle,
-                            subtitle: AppLocalizations.of(context)
-                                .accountStoreLocationBody,
+                            title: l10n.merchantLocationTitle,
+                            subtitle: l10n.accountStoreLocationBody,
                             onTap: () => context.push(MerchantRoutes.location),
                           ),
                           _MenuRow(
                             icon: DealGoIcons.pause,
-                            title: AppLocalizations.of(context).accountBusy,
-                            subtitle: AppLocalizations.of(context)
-                                .accountBusyBody,
+                            title: l10n.accountBusy,
+                            subtitle: l10n.accountBusyBody,
                             onTap: () => context.push(MerchantRoutes.busy),
                           ),
+                          _MenuRow(
+                            icon: DealGoIcons.voucher,
+                            iconBackground: DealGoColors.greenSurface,
+                            iconColor: DealGoColors.brandGreen,
+                            title: l10n.merchantOffersTitle,
+                            subtitle: l10n.accountVouchersBody,
+                            onTap: () => context.push(MerchantRoutes.offers),
+                          ),
+                          _MenuRow(
+                            icon: DealGoIcons.star,
+                            iconBackground: DealGoColors.amberSurface,
+                            iconColor: DealGoColors.amber,
+                            title: l10n.merchantReviewsTitle,
+                            subtitle: l10n.merchantReviewsEmpty,
+                            onTap: () => context.push(MerchantRoutes.reviews),
+                          ),
+                          _MenuRow(
+                            icon: DealGoIcons.layers,
+                            title: l10n.merchantCategoriesTitle,
+                            subtitle: l10n.merchantCategoriesHeadline,
+                            onTap: () =>
+                                context.push(MerchantRoutes.categories),
+                          ),
+                          _MenuRow(
+                            icon: DealGoIcons.history,
+                            title: l10n.merchantHistoryTitle,
+                            subtitle: l10n.accountActivityBody,
+                            onTap: () => context.push(MerchantRoutes.history),
+                          ),
                         ],
-                      ],
-                    ),
+                      ),
+                    ],
                     const SizedBox(height: DealGoSpacing.s20),
                     Text(
-                      AppLocalizations.of(context).accountSectionDisplay,
+                      l10n.accountSectionDisplay,
                       style: textTheme.titleMedium,
                     ),
                     const SizedBox(height: DealGoSpacing.s12),
@@ -237,27 +293,106 @@ class AccountPage extends StatelessWidget {
                         _MenuRow(
                           key: const Key('account-language'),
                           icon: DealGoIcons.languages,
-                          title: AppLocalizations.of(context).accountLanguage,
+                          iconBackground: DealGoColors.subtlePurple,
+                          iconColor: DealGoColors.primary,
+                          title: l10n.accountLanguage,
                           subtitle: localeLabel(
-                            context.watch<AppAppearance>().locale,
+                            appearance.locale,
+                          ),
+                          trailing: _LivelyTrailingBadge(
+                            icon: Icon(
+                              appearance.locale.languageCode == 'vi'
+                                  ? DealGoIcons.earth
+                                  : DealGoIcons.languages,
+                              size: 14,
+                              color: appearance.locale.languageCode == 'vi'
+                                  ? DealGoColors.brandGreen
+                                  : DealGoColors.primary,
+                            ),
+                            label: appearance.locale.languageCode.toUpperCase(),
                           ),
                           onTap: () => showLanguageSheet(context),
                         ),
                         _MenuRow(
                           key: const Key('account-theme'),
-                          icon: DealGoIcons.moon,
-                          title: AppLocalizations.of(context).accountTheme,
+                          icon: switch (appearance.themeChoice) {
+                            AppThemeChoice.system => DealGoIcons.devices,
+                            AppThemeChoice.light => DealGoIcons.sun,
+                            AppThemeChoice.dark => DealGoIcons.moon,
+                          },
+                          iconBackground:
+                              appearance.themeChoice == AppThemeChoice.light
+                                  ? DealGoColors.amberSurface
+                                  : DealGoColors.subtlePurple,
+                          iconColor:
+                              appearance.themeChoice == AppThemeChoice.light
+                                  ? DealGoColors.amber
+                                  : DealGoColors.primary,
+                          title: l10n.accountTheme,
                           subtitle: themeChoiceLabel(
-                            AppLocalizations.of(context),
-                            context.watch<AppAppearance>().themeChoice,
+                            l10n,
+                            appearance.themeChoice,
+                          ),
+                          trailing: _LivelyTrailingBadge(
+                            icon: Icon(
+                              switch (appearance.themeChoice) {
+                                AppThemeChoice.system => DealGoIcons.devices,
+                                AppThemeChoice.light => DealGoIcons.sun,
+                                AppThemeChoice.dark => DealGoIcons.moon,
+                              },
+                              size: 15,
+                              color:
+                                  appearance.themeChoice == AppThemeChoice.light
+                                      ? DealGoColors.amber
+                                      : DealGoColors.primary,
+                            ),
                           ),
                           onTap: () => showThemeSheet(context),
                         ),
+                        if (signedIn != null)
+                          _MenuRow(
+                            key: const ValueKey('account-notif-row'),
+                            icon: DealGoIcons.notifications,
+                            title: l10n.accountNotifPrefs,
+                            subtitle: l10n.accountNotifPrefsBody,
+                            onTap: () => context.push(
+                              AccountRoutes.notificationPrefs(shellPath),
+                            ),
+                          ),
                       ],
                     ),
+                    if (signedIn != null) ...[
+                      const SizedBox(height: DealGoSpacing.s20),
+                      Text(
+                        l10n.securityAccountSection,
+                        style: textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: DealGoSpacing.s12),
+                      _MenuGroup(
+                        children: [
+                          _MenuRow(
+                            key: const ValueKey('account-security-row'),
+                            icon: DealGoIcons.shield,
+                            title: l10n.accountSecurity,
+                            subtitle: l10n.accountSecurityBody,
+                            onTap: () =>
+                                context.push(AccountRoutes.security(shellPath)),
+                          ),
+                          _MenuRow(
+                            key: const ValueKey('account-delete-row'),
+                            icon: DealGoIcons.deleteAccount,
+                            title: l10n.accountDeleteRow,
+                            subtitle: l10n.accountDeleteRowBody,
+                            onTap: () => context.push(
+                              AccountRoutes.deleteAccount(shellPath),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: DealGoSpacing.s20),
                     Text(
-                      AppLocalizations.of(context).accountSectionHelp,
+                      l10n.accountSectionHelp,
                       style: textTheme.titleMedium,
                     ),
                     const SizedBox(height: DealGoSpacing.s12),
@@ -265,9 +400,8 @@ class AccountPage extends StatelessWidget {
                       children: [
                         _MenuRow(
                           icon: DealGoIcons.help,
-                          title: AppLocalizations.of(context).accountSupport,
-                          subtitle: AppLocalizations.of(context)
-                              .accountSupportBody,
+                          title: l10n.accountSupport,
+                          subtitle: l10n.accountSupportBody,
                           onTap: () async {
                             final router = GoRouter.of(context);
                             if (!await openHelpCenterWeb(context)) {
@@ -278,9 +412,8 @@ class AccountPage extends StatelessWidget {
                         _MenuRow(
                           key: const ValueKey('account-support-tickets-row'),
                           icon: DealGoIcons.headset,
-                          title: AppLocalizations.of(context).helpMyTickets,
-                          subtitle: AppLocalizations.of(context)
-                              .accountSupportTicketsBody,
+                          title: l10n.helpMyTickets,
+                          subtitle: l10n.accountSupportTicketsBody,
                           onTap: () => context.push(
                             AccountRoutes.supportTickets(shellPath),
                           ),
@@ -288,21 +421,16 @@ class AccountPage extends StatelessWidget {
                         _MenuRow(
                           key: const ValueKey('account-terms-row'),
                           icon: DealGoIcons.document,
-                          title: AppLocalizations.of(context).legalTermsTitle,
-                          subtitle: AppLocalizations.of(context)
-                              .legalTermsBody,
-                          onTap: () => LegalDocumentPage.open(
-                            context,
-                            LegalSlug.terms,
-                          ),
+                          title: l10n.legalTermsTitle,
+                          subtitle: l10n.legalTermsBody,
+                          onTap: () =>
+                              LegalDocumentPage.open(context, LegalSlug.terms),
                         ),
                         _MenuRow(
                           key: const ValueKey('account-regulations-row'),
                           icon: DealGoIcons.document,
-                          title: AppLocalizations.of(context)
-                              .legalRegulationsTitle,
-                          subtitle: AppLocalizations.of(context)
-                              .legalRegulationsBody,
+                          title: l10n.legalRegulationsTitle,
+                          subtitle: l10n.legalRegulationsBody,
                           onTap: () => LegalDocumentPage.open(
                             context,
                             LegalSlug.regulations,
@@ -311,47 +439,13 @@ class AccountPage extends StatelessWidget {
                         _MenuRow(
                           key: const ValueKey('account-privacy-row'),
                           icon: DealGoIcons.lock,
-                          title: AppLocalizations.of(context).legalPrivacyTitle,
-                          subtitle: AppLocalizations.of(context)
-                              .legalPrivacyBody,
+                          title: l10n.legalPrivacyTitle,
+                          subtitle: l10n.legalPrivacyBody,
                           onTap: () => LegalDocumentPage.open(
                             context,
                             LegalSlug.privacy,
                           ),
                         ),
-                        if (signedIn != null) ...[
-                          _MenuRow(
-                            key: const ValueKey('account-notif-row'),
-                            icon: DealGoIcons.notifications,
-                            title: AppLocalizations.of(context)
-                                .accountNotifPrefs,
-                            subtitle: AppLocalizations.of(context)
-                                .accountNotifPrefsBody,
-                            onTap: () => context.push(
-                              AccountRoutes.notificationPrefs(shellPath),
-                            ),
-                          ),
-                          _MenuRow(
-                            key: const ValueKey('account-security-row'),
-                            icon: DealGoIcons.shield,
-                            title: AppLocalizations.of(context).accountSecurity,
-                            subtitle: AppLocalizations.of(context)
-                                .accountSecurityBody,
-                            onTap: () =>
-                                context.push(AccountRoutes.security(shellPath)),
-                          ),
-                          _MenuRow(
-                            key: const ValueKey('account-delete-row'),
-                            icon: DealGoIcons.deleteAccount,
-                            title: AppLocalizations.of(context)
-                                .accountDeleteRow,
-                            subtitle: AppLocalizations.of(context)
-                                .accountDeleteRowBody,
-                            onTap: () => context.push(
-                              AccountRoutes.deleteAccount(shellPath),
-                            ),
-                          ),
-                        ],
                         const _LogoutRow(),
                       ],
                     ),
@@ -367,9 +461,7 @@ class AccountPage extends StatelessWidget {
 }
 
 class _CustomerPartnerHubCard extends StatelessWidget {
-  const _CustomerPartnerHubCard({
-    required this.profile,
-  });
+  const _CustomerPartnerHubCard({required this.profile});
 
   final UserProfile? profile;
 
@@ -648,8 +740,9 @@ class _ProfileCard extends StatelessWidget {
                           DecoratedBox(
                             decoration: BoxDecoration(
                               color: DealGoColors.greenSurface,
-                              borderRadius:
-                                  BorderRadius.circular(DealGoRadius.pill),
+                              borderRadius: BorderRadius.circular(
+                                DealGoRadius.pill,
+                              ),
                             ),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
@@ -772,6 +865,45 @@ class _LinkLabel extends StatelessWidget {
   }
 }
 
+class _LivelyTrailingBadge extends StatelessWidget {
+  const _LivelyTrailingBadge({required this.icon, this.label});
+
+  final Widget icon;
+  final String? label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: DealGoSpacing.s8,
+        vertical: 4,
+      ),
+      decoration: BoxDecoration(
+        color: DealGoColors.canvas,
+        borderRadius: BorderRadius.circular(DealGoRadius.pill),
+        border: Border.all(color: DealGoColors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          icon,
+          if (label != null) ...[
+            const SizedBox(width: DealGoSpacing.s4),
+            Text(
+              label!,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: DealGoColors.text,
+                    fontSize: 12,
+                  ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _MenuRow extends StatelessWidget {
   const _MenuRow({
     required this.icon,
@@ -844,11 +976,7 @@ class _MenuRow extends StatelessWidget {
 }
 
 class _IconBadge extends StatelessWidget {
-  const _IconBadge({
-    required this.icon,
-    this.background,
-    this.color,
-  });
+  const _IconBadge({required this.icon, this.background, this.color});
 
   final IconData icon;
   final Color? background;

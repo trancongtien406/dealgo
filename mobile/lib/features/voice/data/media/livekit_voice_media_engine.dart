@@ -5,6 +5,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -82,9 +83,13 @@ class LiveKitVoiceMediaEngine implements VoiceMediaEngine {
         );
       }
       // AVAudioSession activation from the background fails with -4100
-      // (Sentry). Give the app a moment to come to the foreground first; CallKit
-      // answers from the lock screen still go ahead after the short wait.
-      await waitForForeground(const Duration(seconds: 3));
+      // (Sentry). Give the app a moment to come to the foreground first, except
+      // when the system call subsystem (iOS CallKit / Android Telecom FGS)
+      // already owns audio — lock-screen and Bluetooth headset answers stay
+      // backgrounded by design and should connect immediately.
+      if (!systemCallOwnsAudio) {
+        await waitForForeground(const Duration(seconds: 3));
+      }
       await runWithAudioSessionRetry(
         () => _joinOnce(url: url, token: token),
         beforeRetry: () async {
@@ -104,7 +109,14 @@ class LiveKitVoiceMediaEngine implements VoiceMediaEngine {
     }
   }
 
+  static const _callKitAudioChannel = MethodChannel('dealgo/callkit_audio');
+
   Future<void> _configureAudioOwnership(bool systemCallOwnsAudio) async {
+    // Initialize FlutterWebRTC before touching LiveKit's engine availability
+    // gate; otherwise peerConnectionFactory?.audioDeviceModule is still nil and
+    // setEngineAvailability fails with PlatformException(setEngineAvailability,
+    // audio device module is unavailable).
+    await LiveKitClient.initialize();
     // externalCallSystem currently retains LiveKit's automatic Android audio
     // focus/routing, while reserving ownership for the self-managed Telecom
     // connection. On iOS it hands activation to CallKit.
@@ -113,7 +125,17 @@ class LiveKitVoiceMediaEngine implements VoiceMediaEngine {
           ? AudioSessionManagementMode.externalCallSystem
           : AudioSessionManagementMode.automatic,
     );
-    if (!systemCallOwnsAudio) {
+    if (systemCallOwnsAudio) {
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+        try {
+          await _callKitAudioChannel.invokeMethod<void>(
+            'syncCallKitAudioGate',
+          );
+        } catch (error) {
+          debugPrint('syncCallKitAudioGate: $error');
+        }
+      }
+    } else {
       await AudioManager.instance.setEngineAvailability(
         AudioEngineAvailability.defaultAvailability,
       );

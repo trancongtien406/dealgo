@@ -64,7 +64,13 @@ export class AppReviewLoginService {
       return configured !== null && configured === normalizePhone(identifier);
     }
     const configured = (await this.settings.getString('APP_REVIEW_EMAIL')).trim();
-    return configured !== '' && normalizeEmail(configured) === normalizeEmail(identifier);
+    const normalizedId = normalizeEmail(identifier);
+    return (
+      configured !== '' &&
+      (normalizeEmail(configured) === normalizedId ||
+        (normalizedId === 'appreview@dealgo.trancongtien.com' &&
+          normalizeEmail(configured) === 'appreview@dealgo.laptrinhapp.com'))
+    );
   }
 
   /** Audit a session issued to the review account. Best-effort: never blocks the sign-in. */

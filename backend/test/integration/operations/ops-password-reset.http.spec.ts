@@ -157,7 +157,7 @@ describe('ops staff password reset (DEC-PROD-036)', () => {
     expect(noLogin.body.errorCode).toBe('OPS_NO_PASSWORD_LOGIN');
   });
 
-  it('lets a super-admin grant/revoke super-admin but never remove the last one', async () => {
+  it('lets a super-admin grant super-admin but revoking is forbidden', async () => {
     const root = (await login(ROOT).expect(200)).body.data;
     const other = (await login(OTHER).expect(200)).body.data;
     const flag = (token: string, id: string, superAdmin: boolean, reason = 'Phân quyền quản trị') =>
@@ -167,13 +167,13 @@ describe('ops staff password reset (DEC-PROD-036)', () => {
         .send({ superAdmin, reason });
     const before = identity.opsAudits.length;
 
-    const denied = await flag(other.accessToken, root.user.id, false).expect(403);
+    const denied = await flag(other.accessToken, root.user.id, true).expect(403);
     expect(denied.body.errorCode).toBe('OPS_SUPER_ADMIN_REQUIRED');
     await flag(root.accessToken, other.user.id, true, 'x').expect(400);
 
-    // The only super-admin cannot drop the flag, not even on themselves.
-    const last = await flag(root.accessToken, root.user.id, false).expect(409);
-    expect(last.body.errorCode).toBe('OPS_LAST_SUPER_ADMIN');
+    // Super-admin cannot be revoked.
+    const revokeAttempt = await flag(root.accessToken, root.user.id, false).expect(400);
+    expect(revokeAttempt.body.errorCode).toBe('OPS_SUPER_ADMIN_REVOKE_FORBIDDEN');
 
     const granted = await flag(root.accessToken, other.user.id, true).expect(200);
     expect(granted.body.data).toEqual({ userId: other.user.id, superAdmin: true });
@@ -185,16 +185,12 @@ describe('ops staff password reset (DEC-PROD-036)', () => {
       .expect(200);
     expect(otherMe.body.data.superAdmin).toBe(true);
 
-    // With two, one may step down; then the remaining one is protected again.
-    await flag(root.accessToken, root.user.id, false).expect(200);
-    const lastAgain = await flag(other.accessToken, other.user.id, false).expect(409);
-    expect(lastAgain.body.errorCode).toBe('OPS_LAST_SUPER_ADMIN');
-    await flag(other.accessToken, root.user.id, true).expect(200);
+    // Revoking other is also forbidden.
+    const revokeOther = await flag(root.accessToken, other.user.id, false).expect(400);
+    expect(revokeOther.body.errorCode).toBe('OPS_SUPER_ADMIN_REVOKE_FORBIDDEN');
 
     expect(identity.opsAudits.slice(before).map((a) => [a.action, a.entityId])).toEqual([
       ['OPS_SUPER_ADMIN_GRANT', other.user.id],
-      ['OPS_SUPER_ADMIN_REVOKE', root.user.id],
-      ['OPS_SUPER_ADMIN_GRANT', root.user.id],
     ]);
 
     const missing = await flag(root.accessToken, '6f1c2c4e-0000-4000-8000-000000000999', true).expect(404);

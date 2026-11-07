@@ -133,10 +133,7 @@ abstract interface class DriverCreditRepository {
     String? idempotencyKey,
   });
 
-  Future<DriverTopUp> topUp({
-    required String accessToken,
-    required String id,
-  });
+  Future<DriverTopUp> topUp({required String accessToken, required String id});
 
   Future<DriverTopUp> cancelTopUp({
     required String accessToken,

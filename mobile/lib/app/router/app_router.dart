@@ -13,6 +13,7 @@ import '../../features/account_settings/presentation/change_password_page.dart';
 import '../../features/account_settings/presentation/edit_profile_page.dart';
 import '../../features/account_settings/presentation/notification_prefs_page.dart';
 import '../../features/account_settings/presentation/security_page.dart';
+import '../../features/account_settings/presentation/passkeys_page.dart';
 import '../../features/account_settings/presentation/sessions_page.dart';
 import '../../features/driver_history/domain/driver_history.dart';
 
@@ -40,6 +41,7 @@ import '../../features/merchant/domain/usecases/mark_merchant_order_ready.dart';
 import '../../features/merchant/presentation/pages/merchant_accept_settings_page.dart';
 import '../../features/merchant/presentation/pages/merchant_busy_page.dart';
 import '../../features/merchant/presentation/pages/merchant_offers_page.dart';
+import '../../features/merchant/presentation/pages/merchant_offer_create_page.dart';
 import '../../features/merchant/presentation/pages/merchant_reviews_page.dart';
 import '../../features/merchant/presentation/pages/merchant_hours_page.dart';
 import '../../features/merchant/presentation/pages/merchant_location_page.dart';
@@ -48,6 +50,7 @@ import '../../features/merchant/presentation/pages/merchant_item_variants_page.d
 import '../../features/merchant/presentation/pages/merchant_item_edit_page.dart';
 import '../../features/merchant/presentation/pages/merchant_categories_page.dart';
 import '../../features/merchant/presentation/pages/merchant_history_page.dart';
+import '../../features/merchant/domain/entities/merchant_menu_models.dart';
 import '../../features/merchant/presentation/pages/merchant_order_page.dart';
 import '../../features/merchant/presentation/pages/merchant_order_resume_page.dart';
 import '../../features/merchant/presentation/cubit/merchant_queue_cubit.dart';
@@ -469,7 +472,10 @@ GoRouter createAppRouter({
           if (status != null) {
             query['status'] = status;
           }
-          return Uri(path: DriverRoutes.credit, queryParameters: query).toString();
+          return Uri(
+            path: DriverRoutes.credit,
+            queryParameters: query,
+          ).toString();
         },
         pageBuilder: (context, state) {
           final q = state.uri.queryParameters;
@@ -721,6 +727,21 @@ MerchantQueueOrder? _merchantOrder(BuildContext context, GoRouterState state) {
   if (extra is MerchantQueueOrder && (id.isEmpty || extra.id == id)) {
     return extra;
   }
+  if (extra is MerchantHistoryOrder && (id.isEmpty || extra.id == id)) {
+    return MerchantQueueOrder(
+      id: extra.id,
+      storeId: '',
+      status: extra.status,
+      deliveryFareVnd: extra.totalVnd - extra.subtotalVnd,
+      subtotalVnd: extra.subtotalVnd,
+      totalVnd: extra.totalVnd,
+      dropoff: const FoodDropoff(lat: 0, lng: 0, label: ''),
+      lineCount: 1,
+      createdAt: extra.createdAt.toIso8601String(),
+      customerName: extra.customerName,
+      customerAvatarUrl: extra.customerAvatarUrl,
+    );
+  }
   return merchantOrderFrom(context.read<MerchantQueueCubit>().state, id);
 }
 
@@ -918,10 +939,13 @@ ShellRoute _merchantScopedShell() {
         builder: (context, state) =>
             const PlacePickerPage(purpose: PlacePickPurpose.storeLocation),
       ),
-
       GoRoute(
         path: MerchantRoutes.categories,
         builder: (context, state) => const MerchantCategoriesPage(),
+      ),
+      GoRoute(
+        path: MerchantRoutes.itemNew,
+        builder: (context, state) => const MerchantItemEditPage(itemId: null),
       ),
       GoRoute(
         path: MerchantRoutes.history,
@@ -958,6 +982,19 @@ ShellRoute _merchantScopedShell() {
           return MerchantItemVariantsPage(itemId: itemId, itemName: name);
         },
       ),
+      GoRoute(
+        path: '/merchant/orders/:orderId',
+        builder: (context, state) {
+          final order = _merchantOrder(context, state);
+          if (order == null) {
+            // A push tap can land here before the queue has loaded.
+            return MerchantOrderResumePage(
+              orderId: state.pathParameters['orderId'] ?? '',
+            );
+          }
+          return MerchantOrderPage(order: order);
+        },
+      ),
     ],
   );
 }
@@ -975,20 +1012,6 @@ StatefulShellRoute _roleShell(List<ShellTab> tabs) {
               path: tab.path,
               builder: (context, state) => ShellTabPage(tab: tab),
               routes: [
-                if (tab.kind == ShellTabKind.merchantOrders)
-                  GoRoute(
-                    path: ':orderId',
-                    builder: (context, state) {
-                      final order = _merchantOrder(context, state);
-                      if (order == null) {
-                        // A push tap can land here before the queue has loaded.
-                        return MerchantOrderResumePage(
-                          orderId: state.pathParameters['orderId'] ?? '',
-                        );
-                      }
-                      return MerchantOrderPage(order: order);
-                    },
-                  ),
                 if (tab.kind == ShellTabKind.account)
                   GoRoute(
                     path: 'notifications',
@@ -1072,6 +1095,11 @@ List<GoRoute> _accountOverlayRoutes(
       path: AccountRoutes.sessions(shellPath),
       parentNavigatorKey: rootNavigatorKey,
       builder: (context, state) => const SessionsPage(),
+    ),
+    GoRoute(
+      path: AccountRoutes.passkeys(shellPath),
+      parentNavigatorKey: rootNavigatorKey,
+      builder: (context, state) => const PasskeysPage(),
     ),
     GoRoute(
       path: AccountRoutes.changePassword(shellPath),

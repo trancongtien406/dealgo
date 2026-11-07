@@ -230,11 +230,6 @@ class _RideRouteOverviewPageState extends State<RideRouteOverviewPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const SizedBox(height: DealGoSpacing.s12),
-                    Text(
-                      l10n.rideRouteOverviewTitle,
-                      style: textTheme.titleLarge,
-                    ),
                     if (_failed)
                       Builder(
                         builder: (context) {

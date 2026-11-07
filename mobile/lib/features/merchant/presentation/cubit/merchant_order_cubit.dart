@@ -24,6 +24,8 @@ final class MerchantOrderViewReady extends MerchantOrderViewState {
   const MerchantOrderViewReady({
     required this.order,
     required this.kitchenLines,
+    this.detail,
+    this.loadingLines = false,
     this.busy = false,
     this.conflict = false,
     this.network = false,
@@ -34,6 +36,12 @@ final class MerchantOrderViewReady extends MerchantOrderViewState {
     this.orderNote,
     this.utensils = true,
   });
+
+  /// Full order detail fetched from the server.
+  final FoodOrderDetail? detail;
+
+  /// Whether lines/details are actively loading from the server.
+  final bool loadingLines;
 
   /// Edit waiting for the customer; "ready" is blocked meanwhile.
   final FoodOrderChange? pendingChange;
@@ -58,6 +66,8 @@ final class MerchantOrderViewReady extends MerchantOrderViewState {
   MerchantOrderViewReady copyWith({
     MerchantQueueOrder? order,
     List<MerchantKitchenLine>? kitchenLines,
+    FoodOrderDetail? detail,
+    bool? loadingLines,
     bool? busy,
     bool? conflict,
     bool? network,
@@ -75,6 +85,8 @@ final class MerchantOrderViewReady extends MerchantOrderViewState {
     return MerchantOrderViewReady(
       order: order ?? this.order,
       kitchenLines: kitchenLines ?? this.kitchenLines,
+      detail: detail ?? this.detail,
+      loadingLines: loadingLines ?? this.loadingLines,
       busy: busy ?? this.busy,
       conflict: conflict ?? this.conflict,
       network: network ?? this.network,
@@ -101,7 +113,13 @@ class MerchantOrderCubit extends Cubit<MerchantOrderViewState> {
     this._rejectMerchantOrder,
     required MerchantQueueOrder order,
     this.realtime,
-  }) : super(MerchantOrderViewReady(order: order, kitchenLines: const []));
+  }) : super(
+         MerchantOrderViewReady(
+           order: order,
+           kitchenLines: const [],
+           loadingLines: true,
+         ),
+       );
 
   // t50u: no poll fallback. REST reload on open, store:{id} hint and socket
   // reconnect (SnapshotBinding), never on a timer.
@@ -169,6 +187,9 @@ class MerchantOrderCubit extends Cubit<MerchantOrderViewState> {
   Future<void> loadLines(String? accessToken) async {
     final token = accessToken?.trim() ?? '';
     if (token.isEmpty) {
+      if (_ready.loadingLines) {
+        emit(_ready.copyWith(loadingLines: false));
+      }
       return;
     }
     final current = _ready;
@@ -184,17 +205,35 @@ class MerchantOrderCubit extends Cubit<MerchantOrderViewState> {
       }
       final latest = _ready;
       final changed = detail.status != latest.order.status;
-      final order = changed
-          ? latest.order.apply(
-              MerchantOrderUpdate(id: latest.order.id, status: detail.status),
-            )
-          : latest.order;
+      final order = MerchantQueueOrder(
+        id: detail.id,
+        storeId: detail.storeId ?? latest.order.storeId,
+        status: detail.status,
+        deliveryFareVnd: detail.deliveryFareVnd,
+        subtotalVnd: detail.subtotalVnd,
+        totalVnd: detail.totalVnd,
+        dropoff: detail.dropoff.label.isNotEmpty
+            ? detail.dropoff
+            : latest.order.dropoff,
+        lineCount: detail.lines.isNotEmpty
+            ? detail.lines.length
+            : latest.order.lineCount,
+        createdAt: latest.order.createdAt,
+        customerName: detail.customerName ?? latest.order.customerName,
+        customerAvatarUrl:
+            detail.customerAvatarUrl ?? latest.order.customerAvatarUrl,
+        driverName: detail.driverName ?? latest.order.driverName,
+        driverAvatarUrl:
+            detail.driverAvatarUrl ?? latest.order.driverAvatarUrl,
+      );
       if (changed) {
         queue.replace(order);
       }
       emit(
         latest.copyWith(
           order: order,
+          detail: detail,
+          loadingLines: false,
           kitchenLines: kitchenLinesFromDetail(detail),
           handoverCode: detail.handoverCode,
           clearHandoverCode: detail.handoverCode == null,
@@ -208,7 +247,9 @@ class MerchantOrderCubit extends Cubit<MerchantOrderViewState> {
         ),
       );
     } catch (_) {
-      // Queue summary remains; kitchen panel stays empty until retry.
+      if (!isClosed) {
+        emit(_ready.copyWith(loadingLines: false));
+      }
     }
   }
 

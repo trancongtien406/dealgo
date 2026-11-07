@@ -33,7 +33,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       listen: false,
     )?.load();
     setState(() => _refreshToken++);
-    await (categoriesFuture ?? Future<void>.delayed(const Duration(milliseconds: 250)));
+    await (categoriesFuture ??
+        Future<void>.delayed(const Duration(milliseconds: 250)));
   }
 
   void _openShop() => context.go('/customer/shop');

@@ -154,6 +154,9 @@ class MerchantOrdersRepositoryImpl implements MerchantOrdersRepository {
     String? description,
     int? prepMinutes,
     String? menuCategoryId,
+    int? originalPriceVnd,
+    List<MerchantItemImageUpload>? newImages,
+    List<FoodOptionGroup>? optionGroups,
   }) {
     return _remote.createCatalogItem(
       accessToken: accessToken,
@@ -163,6 +166,9 @@ class MerchantOrdersRepositoryImpl implements MerchantOrdersRepository {
       description: description,
       prepMinutes: prepMinutes,
       menuCategoryId: menuCategoryId,
+      originalPriceVnd: originalPriceVnd,
+      newImages: newImages,
+      optionGroups: optionGroups,
     );
   }
 
@@ -174,11 +180,17 @@ class MerchantOrdersRepositoryImpl implements MerchantOrdersRepository {
     int? priceVnd,
     bool? available,
     String? description,
+    bool clearDescription = false,
     int? prepMinutes,
+    bool clearPrepMinutes = false,
     String? imageUrl,
+    List<String>? imageUrls,
+    List<MerchantItemImageUpload>? newImages,
     String? menuCategoryId,
+    bool clearMenuCategoryId = false,
     int? originalPriceVnd,
     bool clearOriginalPrice = false,
+    List<FoodOptionGroup>? optionGroups,
   }) {
     return _remote.updateCatalogItem(
       accessToken: accessToken,
@@ -187,12 +199,26 @@ class MerchantOrdersRepositoryImpl implements MerchantOrdersRepository {
       priceVnd: priceVnd,
       available: available,
       description: description,
+      clearDescription: clearDescription,
       prepMinutes: prepMinutes,
+      clearPrepMinutes: clearPrepMinutes,
       imageUrl: imageUrl,
+      imageUrls: imageUrls,
+      newImages: newImages,
       menuCategoryId: menuCategoryId,
+      clearMenuCategoryId: clearMenuCategoryId,
       originalPriceVnd: originalPriceVnd,
       clearOriginalPrice: clearOriginalPrice,
+      optionGroups: optionGroups,
     );
+  }
+
+  @override
+  Future<void> deleteCatalogItem({
+    required String accessToken,
+    required String itemId,
+  }) {
+    return _remote.deleteCatalogItem(accessToken: accessToken, itemId: itemId);
   }
 
   @override
@@ -265,12 +291,16 @@ class MerchantOrdersRepositoryImpl implements MerchantOrdersRepository {
     int limit = 20,
     String? tab,
     String? q,
+    DateTime? from,
+    DateTime? to,
   }) => _remote.listOrderHistory(
     accessToken: accessToken,
     page: page,
     limit: limit,
     tab: tab,
     q: q,
+    from: from,
+    to: to,
   );
 
   @override

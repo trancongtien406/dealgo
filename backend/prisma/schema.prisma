@@ -80,6 +80,7 @@ model User {
   customerCredential          CustomerCredential?
   customerRides               Ride[]                      @relation("CustomerRides")
   assignedRides               Ride[]                      @relation("AssignedRides")
+  dismissedRideRequests       RideRequestDismissal[]      @relation("DismissedRideRequests")
   driverOffers                RideOffer[]                 @relation("DriverOffers")
   rideSelections              RideSelection[]             @relation("CustomerRideSelections")
   ownedStores                 FoodStore[]
@@ -395,16 +396,16 @@ enum RideOfferStatus {
 
 // Partial unique index rides_one_negotiating_per_customer is defined in SQL.
 model Ride {
-  id                      String            @id @default(uuid()) @db.Uuid
-  customerId              String            @db.Uuid
-  customer                User              @relation("CustomerRides", fields: [customerId], references: [id], onDelete: Restrict)
+  id                      String                 @id @default(uuid()) @db.Uuid
+  customerId              String                 @db.Uuid
+  customer                User                   @relation("CustomerRides", fields: [customerId], references: [id], onDelete: Restrict)
   pickupLat               Float
   pickupLng               Float
-  pickupLabel             String            @db.VarChar(160)
+  pickupLabel             String                 @db.VarChar(160)
   dropoffLat              Float
   dropoffLng              Float
-  dropoffLabel            String            @db.VarChar(160)
-  serviceRegionCode       String?           @db.VarChar(8)
+  dropoffLabel            String                 @db.VarChar(160)
+  serviceRegionCode       String?                @db.VarChar(8)
   offeredFareVnd          Int
   referenceFareVnd        Int
   /// Class code copied at booking. No FK: disabling a class must not erase history.
@@ -412,52 +413,53 @@ model Ride {
   /// app/API must set an explicit catalog class on create — do not rely on the DB default.
   /// TODO: migration to drop @default once backfill verified.
   /// No default — every write path passes the class the customer chose.
-  vehicleClassCode        String            @db.VarChar(32)
+  vehicleClassCode        String                 @db.VarChar(32)
   agreedFareVnd           Int?
   /// DEC-PROD-024: voucher reserved at offer selection; the customer pays agreedFareVnd - discountVnd.
-  discountVnd             Int               @default(0)
-  voucherCode             String?           @db.VarChar(40)
+  discountVnd             Int                    @default(0)
+  voucherCode             String?                @db.VarChar(40)
   voucherSponsor          PromotionSponsor?
   status                  RideStatus
   cancelledBy             CancelActor?
-  assignedDriverId        String?           @db.Uuid
-  assignedDriver          User?             @relation("AssignedRides", fields: [assignedDriverId], references: [id], onDelete: Restrict)
-  selectedOfferId         String?           @unique @db.Uuid
-  selectedOffer           RideOffer?        @relation("SelectedOffer", fields: [selectedOfferId], references: [id], onDelete: Restrict)
+  assignedDriverId        String?                @db.Uuid
+  assignedDriver          User?                  @relation("AssignedRides", fields: [assignedDriverId], references: [id], onDelete: Restrict)
+  selectedOfferId         String?                @unique @db.Uuid
+  selectedOffer           RideOffer?             @relation("SelectedOffer", fields: [selectedOfferId], references: [id], onDelete: Restrict)
   expiresAt               DateTime
   /// When the current driver was assigned (late-cancel fee window).
   assignedAt              DateTime?
   /// Last status transition (assignment/en-route timeouts, no-show wait).
   statusChangedAt         DateTime?
   /// Customer did not show up (cancelledBy=CUSTOMER).
-  noShow                  Boolean           @default(false)
+  noShow                  Boolean                @default(false)
   /// Reason code for cancellations/returns (driver cancel, timeout, no-show).
-  cancelReasonCode        String?           @db.VarChar(40)
+  cancelReasonCode        String?                @db.VarChar(40)
   /// Earlier unpaid customer fees collected in this ride's cash (set at completion).
-  priorFeesVnd            Int               @default(0)
+  priorFeesVnd            Int                    @default(0)
   /// Customer fare raises so far; each raise opens a new negotiation round.
-  fareRaiseCount          Int               @default(0)
+  fareRaiseCount          Int                    @default(0)
   /// Customer opt-in: server selects the first live ACCEPT at offeredFareVnd.
-  autoAcceptOfferedFare   Boolean           @default(false)
+  autoAcceptOfferedFare   Boolean                @default(false)
   /// The EXPIRED ride this request re-posts (one-tap re-post).
-  repostOfRideId          String?           @db.Uuid
+  repostOfRideId          String?                @db.Uuid
   /// Multi-stop (feature-flagged). Intermediate stops live in ride_stops; pickup/dropoff above stay
   /// the first/last point so single-destination code keeps working. Bumped on every stop edit.
-  routeVersion            Int               @default(0)
+  routeVersion            Int                    @default(0)
   /// t82u: road distance pickup→stops→dropoff (km) priced at booking / last stop edit. Null = legacy row.
   routeDistanceKm         Float?
-  stopCount               Int               @default(0)
+  stopCount               Int                    @default(0)
   /// Per-stop fee snapshot (already included in referenceFareVnd).
-  stopFeeVnd              Int               @default(0)
+  stopFeeVnd              Int                    @default(0)
   /// Wait policy snapshot at booking (admin changes never touch live rides).
-  stopWaitFreeMinutes     Int               @default(0)
-  stopWaitFeeVndPerMinute Int               @default(0)
+  stopWaitFreeMinutes     Int                    @default(0)
+  stopWaitFeeVndPerMinute Int                    @default(0)
   /// Wait fee charged at completion (cash, goes to the driver).
-  waitFeeVnd              Int               @default(0)
-  idempotencyKey          String            @db.VarChar(200)
-  createdAt               DateTime          @default(now())
-  updatedAt               DateTime          @updatedAt
-  offers                  RideOffer[]       @relation("RideOffers")
+  waitFeeVnd              Int                    @default(0)
+  idempotencyKey          String                 @db.VarChar(200)
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  offers                  RideOffer[]            @relation("RideOffers")
+  requestDismissals       RideRequestDismissal[]
   selections              RideSelection[]
   chatThread              ChatThread?
   pickupCode              RidePickupCode?
@@ -478,6 +480,20 @@ model Ride {
   @@index([serviceRegionCode, status, updatedAt])
   @@index([status, vehicleClassCode])
   @@map("rides")
+}
+
+/// A driver's durable "Bỏ qua" decision for one open ride request. Dispatch fan-out,
+/// re-push and the driver's open feed must all honor this server-side record.
+model RideRequestDismissal {
+  rideId      String   @db.Uuid
+  driverId    String   @db.Uuid
+  dismissedAt DateTime @default(now())
+  ride        Ride     @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  driver      User     @relation("DismissedRideRequests", fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@id([rideId, driverId])
+  @@index([driverId, dismissedAt(sort: Desc)])
+  @@map("ride_request_dismissals")
 }
 
 /// Intermediate stop of a multi-stop ride, visited in `seq` order (1..n) between pickup and dropoff.

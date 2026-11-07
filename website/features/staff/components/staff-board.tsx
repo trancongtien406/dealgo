@@ -101,7 +101,7 @@ export function StaffBoard() {
   const superAdminMutation = useSetStaffSuperAdminMutation();
   const roleMutation = useSetStaffRoleMutation();
 
-  const pagedPeople = data?.items ?? [];
+  const pagedPeople = (data?.items ?? []).filter((p) => !p.superAdmin);
   const total = data?.total ?? pagedPeople.length;
   const lastPage = Math.max(1, Math.ceil(total / pageSize));
   const currentPage = Math.min(page, lastPage);
@@ -474,7 +474,7 @@ export function StaffBoard() {
                                     onClick={() => setSuperAdminTarget(person)}
                                     className="ml-1 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-ink hover:bg-canvas cursor-pointer"
                                   >
-                                    {person.superAdmin ? "Thu hồi super-admin" : "Cấp super-admin"}
+                                    Cấp super-admin
                                   </button>
                                 ) : null}
                               </AdminTableCell>
@@ -595,29 +595,20 @@ export function StaffBoard() {
       />
       <ReasonDialog
         open={superAdminTarget !== null}
-        title={superAdminTarget?.superAdmin ? "Thu hồi quyền super-admin" : "Cấp quyền super-admin"}
-        description={
-          superAdminTarget?.superAdmin
-            ? `${superAdminTarget.name} sẽ không còn đặt lại mật khẩu hay phân quyền super-admin được. Hệ thống luôn giữ ít nhất một super-admin.`
-            : `${superAdminTarget?.name ?? ""} sẽ được đặt lại mật khẩu nhân sự khác và cấp/thu hồi super-admin.`
-        }
-        confirmLabel={superAdminTarget?.superAdmin ? "Thu hồi" : "Cấp quyền"}
-        tone={superAdminTarget?.superAdmin ? "danger" : "brand"}
+        title="Cấp quyền super-admin"
+        description={`${superAdminTarget?.name ?? ""} sẽ được đặt lại mật khẩu nhân sự khác và cấp quyền quản trị cao nhất.`}
+        confirmLabel="Cấp quyền"
+        tone="brand"
         testId="staff-super-admin-dialog"
         onClose={() => setSuperAdminTarget(null)}
         onSubmit={async (reason) => {
           if (!superAdminTarget) return;
-          const grant = !superAdminTarget.superAdmin;
           await superAdminMutation.mutateAsync({
             id: superAdminTarget.id,
-            superAdmin: grant,
+            superAdmin: true,
             reason,
           });
-          toast.success(
-            grant
-              ? `Đã cấp super-admin cho ${superAdminTarget.name}.`
-              : `Đã thu hồi super-admin của ${superAdminTarget.name}.`,
-          );
+          toast.success(`Đã cấp super-admin cho ${superAdminTarget.name}.`);
         }}
       />
     </div>

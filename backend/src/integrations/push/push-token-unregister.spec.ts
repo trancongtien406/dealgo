@@ -12,6 +12,14 @@ describe('PushTokenService.unregister', () => {
       unregistered: true,
     });
   });
+
+  it('removes all tokens for that user with unregisterAll', async () => {
+    const svc = new PushTokenService({ db: () => null } as never);
+    await svc.register('u1', 'token-aaaaaaaa', 'ios');
+    await svc.register('u1', 'token-bbbbbbbb', 'android');
+    await svc.unregisterAll('u1');
+    expect(await svc.tokensForUser('u1')).toEqual([]);
+  });
 });
 
 describe('PushTokenService device ownership', () => {
@@ -57,5 +65,39 @@ describe('PushTokenService.tokensForUser skipPlatforms', () => {
       'token-and-bbbbbb',
       'token-ios-aaaaaa',
     ]);
+  });
+});
+
+describe('PushTokenService session gating', () => {
+  it('returns empty tokens if the user has no active sessions (logged out)', async () => {
+    const findFirst = vi.fn().mockResolvedValue(null);
+    const findMany = vi.fn().mockResolvedValue([{ token: 'device-token-1' }]);
+    const db = {
+      session: { findFirst },
+      pushDeviceToken: { findMany },
+    };
+    const svc = new PushTokenService({ db: () => db } as never);
+    const tokens = await svc.tokensForUser('u1');
+    expect(tokens).toEqual([]);
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ userId: 'u1', revokedAt: null }),
+      }),
+    );
+    expect(findMany).not.toHaveBeenCalled();
+  });
+
+  it('returns tokens when the user has an active session', async () => {
+    const findFirst = vi.fn().mockResolvedValue({ id: 'sess-1' });
+    const findMany = vi.fn().mockResolvedValue([{ token: 'device-token-1' }]);
+    const db = {
+      session: { findFirst },
+      pushDeviceToken: { findMany },
+    };
+    const svc = new PushTokenService({ db: () => db } as never);
+    const tokens = await svc.tokensForUser('u1');
+    expect(tokens).toEqual(['device-token-1']);
+    expect(findFirst).toHaveBeenCalled();
+    expect(findMany).toHaveBeenCalled();
   });
 });

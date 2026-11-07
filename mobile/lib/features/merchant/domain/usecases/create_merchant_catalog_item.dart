@@ -16,6 +16,9 @@ class CreateMerchantCatalogItem {
       description: params.description,
       prepMinutes: params.prepMinutes,
       menuCategoryId: params.menuCategoryId,
+      originalPriceVnd: params.originalPriceVnd,
+      newImages: params.newImages,
+      optionGroups: params.optionGroups,
     );
   }
 }

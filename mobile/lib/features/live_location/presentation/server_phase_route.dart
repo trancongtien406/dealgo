@@ -49,11 +49,16 @@ List<MapLatLng> serverPhasePolyline({
   required RouteGeometry? approachSeed,
   required RouteGeometry? trip,
 }) {
-  final leg = pushed ?? (approach ? (approachSeed ?? trip) : trip);
-  if (leg == null || !leg.hasRoadPolyline) {
-    return const [];
+  if (pushed != null) {
+    return pushed.hasRoadPolyline ? pushed.coords : const [];
   }
-  return leg.coords;
+  if (approach && approachSeed != null && approachSeed.hasRoadPolyline) {
+    return approachSeed.coords;
+  }
+  if (trip != null && trip.hasRoadPolyline) {
+    return trip.coords;
+  }
+  return const [];
 }
 
 class _ServerPhaseRouteState extends State<ServerPhaseRoute> {

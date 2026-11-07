@@ -6443,6 +6443,108 @@ class AppLocalizationsVi extends AppLocalizations {
       'Cần xác minh tài khoản trước khi thêm passkey.';
 
   @override
+  String securityPasskeysCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count passkey',
+      one: '1 passkey',
+      zero: 'Chưa thiết lập',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get passkeysHeader => 'Passkey';
+
+  @override
+  String get passkeysTitle => 'Passkey của tài khoản';
+
+  @override
+  String get passkeysIntro =>
+      'Passkey cho phép đăng nhập bằng vân tay, khuôn mặt hoặc khóa màn hình thay vì mã xác minh. Hãy thêm trên từng thiết bị bạn dùng.';
+
+  @override
+  String get passkeysAdd => 'Thêm passkey cho thiết bị này';
+
+  @override
+  String get passkeysEmpty =>
+      'Chưa có passkey. Thêm để đăng nhập nhanh và an toàn hơn.';
+
+  @override
+  String get passkeysItemTitle => 'Passkey';
+
+  @override
+  String passkeysAddedOn(String date) {
+    return 'Thêm lúc $date';
+  }
+
+  @override
+  String get passkeysSynced => 'Đồng bộ giữa các thiết bị của bạn';
+
+  @override
+  String get passkeysThisDeviceOnly => 'Chỉ lưu trên một thiết bị';
+
+  @override
+  String get passkeysRemove => 'Xóa';
+
+  @override
+  String get passkeysRemoveTitle => 'Xóa passkey này?';
+
+  @override
+  String get passkeysRemoveBody =>
+      'Bạn sẽ không thể đăng nhập bằng passkey này nữa. Các cách đăng nhập khác giữ nguyên.';
+
+  @override
+  String get passkeysRemoved => 'Đã xóa passkey.';
+
+  @override
+  String get passkeysLastCredential =>
+      'Đây là cách đăng nhập duy nhất của bạn. Hãy thêm số điện thoại/email đã xác minh hoặc passkey khác trước.';
+
+  @override
+  String get passkeysLoadFailed => 'Không tải được danh sách passkey.';
+
+  @override
+  String get sessionsActiveNow => 'Đang hoạt động';
+
+  @override
+  String sessionsLastActive(String when) {
+    return 'Hoạt động gần nhất $when';
+  }
+
+  @override
+  String sessionsSignedInAt(String when) {
+    return 'Đăng nhập lúc $when';
+  }
+
+  @override
+  String sessionsIp(String ip) {
+    return 'IP $ip';
+  }
+
+  @override
+  String get sessionsAdminWeb => 'Admin Web';
+
+  @override
+  String get sessionsUnknownDevice => 'Thiết bị không xác định';
+
+  @override
+  String get sessionsLogoutTitle => 'Đăng xuất thiết bị này?';
+
+  @override
+  String get sessionsLogoutBody =>
+      'Thiết bị sẽ phải đăng nhập lại. Nếu không nhận ra thiết bị này, hãy kiểm tra lại các phương thức đăng nhập.';
+
+  @override
+  String get sessionsLogoutOthersTitle => 'Đăng xuất tất cả thiết bị khác?';
+
+  @override
+  String sessionsCount(int count) {
+    return '$count thiết bị đang đăng nhập';
+  }
+
+  @override
   String get merchantProfileTitle => 'Hồ sơ quán';
 
   @override
@@ -7075,6 +7177,99 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get merchantReviewsEmpty => 'Chưa có đánh giá';
+
+  @override
+  String get merchantReviewsFilterNone => 'Không có đánh giá phù hợp bộ lọc';
+
+  @override
+  String get merchantReviewsSearch => 'Tìm kiếm nhận xét hoặc phản hồi...';
+
+  @override
+  String get merchantReviewsFilterTitle => 'Bộ lọc & Sắp xếp';
+
+  @override
+  String get merchantReviewsFilterStars => 'Số sao';
+
+  @override
+  String get merchantReviewsFilterReplied => 'Phản hồi quán';
+
+  @override
+  String get merchantReviewsFilterRepliedAll => 'Tất cả';
+
+  @override
+  String get merchantReviewsFilterRepliedYes => 'Đã phản hồi';
+
+  @override
+  String get merchantReviewsFilterRepliedNo => 'Chưa phản hồi';
+
+  @override
+  String get merchantReviewsFilterComment => 'Bình luận';
+
+  @override
+  String get merchantReviewsFilterCommentAll => 'Tất cả';
+
+  @override
+  String get merchantReviewsFilterCommentOnly => 'Có nhận xét';
+
+  @override
+  String get merchantReviewsFilterVisibility => 'Trạng thái hiển thị';
+
+  @override
+  String get merchantReviewsFilterVisAll => 'Tất cả';
+
+  @override
+  String get merchantReviewsFilterVisVisible => 'Đang hiển thị';
+
+  @override
+  String get merchantReviewsFilterVisHidden => 'Đã ẩn';
+
+  @override
+  String get merchantReviewsFilterTags => 'Nhãn đánh giá';
+
+  @override
+  String get merchantReviewsFilterTagAll => 'Tất cả nhãn';
+
+  @override
+  String get merchantReviewsFilterDate => 'Khoảng thời gian';
+
+  @override
+  String get merchantReviewsFilterDateAll => 'Toàn bộ';
+
+  @override
+  String get merchantReviewsFilterDateToday => 'Hôm nay';
+
+  @override
+  String get merchantReviewsFilterDate7Days => '7 ngày qua';
+
+  @override
+  String get merchantReviewsFilterDate30Days => '30 ngày qua';
+
+  @override
+  String get merchantReviewsFilterDateCustom => 'Chọn dải ngày';
+
+  @override
+  String get merchantReviewsFilterSort => 'Sắp xếp';
+
+  @override
+  String get merchantReviewsFilterSortNewest => 'Mới nhất';
+
+  @override
+  String get merchantReviewsFilterSortOldest => 'Cũ nhất';
+
+  @override
+  String get merchantReviewsFilterSortLowest => 'Điểm thấp nhất';
+
+  @override
+  String get merchantReviewsFilterSortHighest => 'Điểm cao nhất';
+
+  @override
+  String get merchantReviewsFilterReset => 'Đặt lại';
+
+  @override
+  String get merchantReviewsFilterApply => 'Áp dụng';
+
+  @override
+  String get merchantReviewsFilterActive => 'Đã lọc';
 
   @override
   String get merchantReviewHidden => 'Đã ẩn';
@@ -8017,6 +8212,12 @@ class AppLocalizationsVi extends AppLocalizations {
   String get contactPhoneDialFailed => 'Không mở được ứng dụng gọi điện.';
 
   @override
+  String get contactPhoneSimLabel => 'Gọi qua số máy (SIM)';
+
+  @override
+  String get contactPhoneCallNow => 'Gọi ngay';
+
+  @override
   String get kycReviewAvatar => 'Ảnh đại diện';
 
   @override
@@ -8108,9 +8309,6 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get foodFareIncrease => 'Tăng phí giao';
-
-  @override
-  String get foodFareReset => 'Dùng phí gợi ý';
 
   @override
   String get foodFareNegotiationTitle => 'Phí giao';
@@ -8375,5 +8573,169 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String foodReorderStripItems(int count, String total) {
     return '$count món · $total';
+  }
+
+  @override
+  String merchantItemPhotoCount(int count, int max) {
+    return '$count/$max ảnh';
+  }
+
+  @override
+  String merchantItemPhotoLimitError(int max) {
+    return 'Tối đa $max ảnh cho mỗi món ăn.';
+  }
+
+  @override
+  String get merchantItemPhotoHint =>
+      'Ảnh đầu tiên là ảnh đại diện. Thêm hoặc xoá ảnh sẽ được lưu cùng biểu mẫu.';
+
+  @override
+  String get merchantItemPhotoCover => 'Ảnh bìa';
+
+  @override
+  String get merchantItemPhotoNew => 'Mới';
+
+  @override
+  String get merchantItemPhotoEmpty => 'Chưa có ảnh';
+
+  @override
+  String get merchantItemPhotoCamera => 'Chụp ảnh';
+
+  @override
+  String get merchantItemCategoryNone => 'Chưa phân loại';
+
+  @override
+  String get merchantItemCategoryCreateTitle => 'Tạo danh mục mới';
+
+  @override
+  String get merchantItemPricingSection => 'Giá bán & Khuyến mãi';
+
+  @override
+  String get merchantItemPrepSection => 'Chế biến & Hiển thị';
+
+  @override
+  String merchantItemPrepMinutesChip(int minutes) {
+    return '$minutes phút';
+  }
+
+  @override
+  String get merchantItemPrepClear => 'Xoá';
+
+  @override
+  String merchantItemOptionsGroupCount(int count) {
+    return '$count nhóm';
+  }
+
+  @override
+  String merchantItemOptionsChoicesCount(int count) {
+    return 'Các lựa chọn ($count)';
+  }
+
+  @override
+  String get merchantItemOptionsDefaultChoice => 'Mặc định';
+
+  @override
+  String get merchantItemDeleteAction => 'Xoá món ăn';
+
+  @override
+  String get merchantItemDeleteConfirmTitle => 'Xoá món ăn?';
+
+  @override
+  String merchantItemDeleteConfirmBody(String name) {
+    return 'Món \"$name\" sẽ bị xoá khỏi thực đơn.';
+  }
+
+  @override
+  String get merchantItemDeleted => 'Đã xoá món ăn';
+
+  @override
+  String get merchantProductsAllCategories => 'Tất cả danh mục';
+
+  @override
+  String merchantProductsCount(int shown, int total) {
+    return '$shown/$total món';
+  }
+
+  @override
+  String get merchantStatsRange14 => '14 ngày';
+
+  @override
+  String get merchantStatsMetricOrders => 'Đơn hàng';
+
+  @override
+  String get merchantStatsMetricRevenue => 'Doanh thu';
+
+  @override
+  String get merchantStatsAvgOrderValue => 'Giá trị TB/đơn';
+
+  @override
+  String get merchantStatsCompletionRate => 'Tỷ lệ hoàn tất';
+
+  @override
+  String get merchantStatsCancelledOrders => 'Đơn đã huỷ';
+
+  @override
+  String get merchantStatsDailyAvgSales => 'TB doanh thu/ngày';
+
+  @override
+  String get merchantStatsPeakDay => 'Ngày cao điểm';
+
+  @override
+  String merchantStatsSelectedDay(String date) {
+    return 'Ngày $date';
+  }
+
+  @override
+  String get merchantStatsTapBarHint =>
+      'Chạm vào cột biểu đồ để xem chi tiết từng ngày';
+
+  @override
+  String merchantStatsItemShare(int percent) {
+    return '$percent% tổng phần bán';
+  }
+
+  @override
+  String get merchantStatsQuickHistory => 'Lịch sử đơn';
+
+  @override
+  String get merchantStatsQuickOffers => 'Ưu đãi quán';
+
+  @override
+  String get merchantStatsQuickReviews => 'Phản hồi đánh giá';
+
+  @override
+  String merchantStatsStatementHistoryBtn(int count) {
+    return 'Xem $count kỳ đối soát';
+  }
+
+  @override
+  String get merchantStatsStatementHistoryTitle => 'Lịch sử các kỳ đối soát';
+
+  @override
+  String get merchantStatsMenuStatus => 'Tình trạng thực đơn';
+
+  @override
+  String merchantStatsMenuItemsCount(int available, int total) {
+    return '$available/$total món đang mở bán';
+  }
+
+  @override
+  String merchantStatsDayDetailTitle(String date) {
+    return 'Chi tiết ngày $date';
+  }
+
+  @override
+  String merchantStatsNetShare(int percent) {
+    return 'Thực nhận ($percent%)';
+  }
+
+  @override
+  String merchantStatsCommissionShare(int percent) {
+    return 'Hoa hồng ($percent%)';
+  }
+
+  @override
+  String merchantStatsDayRow(int delivered, int cancelled) {
+    return '$delivered hoàn tất · $cancelled huỷ';
   }
 }

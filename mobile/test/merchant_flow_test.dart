@@ -528,7 +528,7 @@ void main() {
     await _revealAboveNav(tester, open);
     await tester.tap(open);
     await tester.pumpAndSettle();
-    expect(find.text('Tình trạng cửa hàng'), findsOneWidget);
+    expect(find.text('Bận / Tạm ngưng'), findsOneWidget);
     expect(find.text('Đang nhận đơn'), findsOneWidget);
     expect(find.byKey(const Key('merchant-busy-resume-30')), findsNothing);
 
@@ -843,7 +843,7 @@ void main() {
     await _revealAboveNav(tester, link);
     await tester.tap(link);
     await tester.pumpAndSettle();
-    expect(find.text('Lịch hoạt động'), findsOneWidget);
+    expect(find.text('Giờ mở cửa'), findsOneWidget);
     expect(find.byKey(const Key('merchant-hours-unset')), findsOneWidget);
 
     // Sunday off.
@@ -944,7 +944,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(link);
     await tester.pumpAndSettle();
-    expect(find.text('Thiết lập nhận đơn'), findsOneWidget);
+    expect(find.text('Cấu hình nhận đơn'), findsOneWidget);
     expect(find.text('Trạng thái hoạt động: đang nhận đơn'), findsOneWidget);
     expect(
       find.text('Cài đặt này hiện chỉ lưu trên thiết bị này.'),
@@ -1010,7 +1010,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(open);
     await tester.pumpAndSettle();
-    expect(find.text('Tình trạng cửa hàng'), findsOneWidget);
+    expect(find.text('Bận / Tạm ngưng'), findsOneWidget);
     expect(find.byKey(const Key('merchant-busy-extra-30')), findsNothing);
     final busy = find.byKey(const Key('merchant-busy-busy'));
     await tester.ensureVisible(busy);

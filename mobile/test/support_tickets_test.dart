@@ -1,3 +1,4 @@
+import 'package:dealgo/core/design_system/tokens/dealgo_tokens.dart';
 import 'package:dealgo/core/network/api_exception.dart';
 import 'package:dealgo/features/support/data/support_remote_datasource.dart';
 import 'package:dealgo/features/support/domain/support_ticket.dart';
@@ -246,6 +247,16 @@ void main() {
     await _go(tester, '/customer/account/help/tickets');
     expect(find.text('Đã phản hồi'), findsOneWidget);
     expect(find.text('Tất cả · 2'), findsOneWidget);
+
+    final allFilterMaterial = tester.widget<Material>(
+      find.descendant(
+        of: find.byKey(const Key('support-filter-all')),
+        matching: find.byType(Material),
+      ),
+    );
+    expect(allFilterMaterial.shape, isA<RoundedRectangleBorder>());
+    final shape = allFilterMaterial.shape as RoundedRectangleBorder;
+    expect(shape.borderRadius, BorderRadius.circular(DealGoRadius.small));
 
     await tester.ensureVisible(find.byKey(const Key('support-filter-done')));
     await tester.tap(find.byKey(const Key('support-filter-done')));

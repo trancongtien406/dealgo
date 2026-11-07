@@ -27,6 +27,7 @@ import {
   UniqueConflictError,
   type IdentityRepository,
   type RoleName,
+  type UserRecord,
 } from '../identity/identity.repository.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { MAPS_PORT } from '../../integrations/maps/maps.constants.js';
@@ -257,6 +258,10 @@ export type PublicFoodOrder = Omit<
   estimatedReadyAt: string | null;
   /** Last status change as ISO (delivery time once DELIVERED); history/receipts show it. */
   updatedAt: string;
+  customerName?: string | null;
+  customerAvatarUrl?: string | null;
+  driverName?: string | null;
+  driverAvatarUrl?: string | null;
   /** DEC-PROD-036: customer only, while ASSIGNED/PICKED_UP and FOOD_DELIVERY_CODE_REQUIRED. */
   deliveryCode?: string;
   /** DEC-PROD-036: store owner only, while ASSIGNED and FOOD_HANDOVER_CODE_REQUIRED. */
@@ -364,7 +369,9 @@ export type MerchantQueueOrder = Omit<
   'customerId' | 'assignedDriverId'
 > & {
   customerName: string | null;
+  customerAvatarUrl?: string | null;
   driverName: string | null;
+  driverAvatarUrl?: string | null;
 };
 
 export type PublicStoreDetail = Omit<StoreDetail, 'acceptSettings'> & {
@@ -781,7 +788,7 @@ export class FoodService {
     await this.requireActiveRole(actor.userId, 'MERCHANT');
     await this.ownedStore(actor.userId);
     const moderationRequired = await this.itemModerationRequired();
-    return this.unwrapCatalog(() =>
+    let created = await this.unwrapCatalog(() =>
       this.food.createItem({
         ownerId: actor.userId,
         name: dto.name,
@@ -795,9 +802,24 @@ export class FoodService {
         description: dto.description,
         prepMinutes: dto.prepMinutes,
         imageUrl: dto.imageUrl,
+        imageUrls: dto.imageUrls,
         menuCategoryId: dto.menuCategoryId,
       }),
     );
+    if (dto.optionGroups !== undefined) {
+      created = await this.replaceItemOptions(actor, created.id, {
+        groups: dto.optionGroups,
+      });
+    }
+    return created;
+  }
+
+  async deleteItem(
+    actor: RequestActor,
+    itemId: string,
+  ): Promise<{ deleted: true; id: string; imageUrls: string[] }> {
+    await this.requireActiveRole(actor.userId, 'MERCHANT');
+    return this.unwrapCatalog(() => this.food.deleteItem(actor.userId, itemId));
   }
 
   async findItemImageUrl(itemId: string): Promise<string | null> {
@@ -822,7 +844,10 @@ export class FoodService {
       dto.description === undefined &&
       dto.prepMinutes === undefined &&
       dto.imageUrl === undefined &&
-      dto.menuCategoryId === undefined
+      dto.imageUrls === undefined &&
+      dto.newImages === undefined &&
+      dto.menuCategoryId === undefined &&
+      dto.optionGroups === undefined
     ) {
       throw foodError(
         400,
@@ -830,7 +855,7 @@ export class FoodService {
         'Provide at least one field to update',
       );
     }
-    return this.unwrapCatalog(() =>
+    let updated = await this.unwrapCatalog(() =>
       this.food.updateItem({
         ownerId: actor.userId,
         itemId,
@@ -844,9 +869,16 @@ export class FoodService {
         description: dto.description,
         prepMinutes: dto.prepMinutes,
         imageUrl: dto.imageUrl,
+        imageUrls: dto.imageUrls,
         menuCategoryId: dto.menuCategoryId,
       }),
     );
+    if (dto.optionGroups !== undefined) {
+      updated = await this.replaceItemOptions(actor, itemId, {
+        groups: dto.optionGroups,
+      });
+    }
+    return updated;
   }
 
   async replaceItemOptions(
@@ -1277,26 +1309,32 @@ export class FoodService {
   async listQueue(actor: RequestActor): Promise<MerchantQueueOrder[]> {
     await this.requireActiveRole(actor.userId, 'MERCHANT');
     const rows = await this.food.listQueue(actor.userId);
-    const names = new Map<string, Promise<string | null>>();
-    const nameOf = (userId: string | null): Promise<string | null> => {
+    const users = new Map<string, Promise<UserRecord | null>>();
+    const userOf = (userId: string | null): Promise<UserRecord | null> => {
       if (!userId) {
         return Promise.resolve(null);
       }
-      let pending = names.get(userId);
+      let pending = users.get(userId);
       if (!pending) {
-        pending = this.identity
-          .findUserById(userId)
-          .then((user) => maskPersonName(user?.displayName));
-        names.set(userId, pending);
+        pending = this.identity.findUserById(userId);
+        users.set(userId, pending);
       }
       return pending;
     };
     return Promise.all(
-      rows.map(async ({ customerId, assignedDriverId, ...row }) => ({
-        ...row,
-        customerName: await nameOf(customerId),
-        driverName: await nameOf(assignedDriverId),
-      })),
+      rows.map(async ({ customerId, assignedDriverId, ...row }) => {
+        const [c, d] = await Promise.all([
+          userOf(customerId),
+          userOf(assignedDriverId),
+        ]);
+        return {
+          ...row,
+          customerName: maskPersonName(c?.displayName),
+          customerAvatarUrl: c?.avatarUrl ?? null,
+          driverName: maskPersonName(d?.displayName),
+          driverAvatarUrl: d?.avatarUrl ?? null,
+        };
+      }),
     );
   }
 
@@ -1553,6 +1591,16 @@ export class FoodService {
       throw foodError(404, 'FOOD_ORDER_NOT_FOUND', 'Food order not found');
     }
     const view = publish(order);
+    const [customerUser, driverUser] = await Promise.all([
+      this.identity.findUserById(order.customerId),
+      order.assignedDriverId
+        ? this.identity.findUserById(order.assignedDriverId)
+        : Promise.resolve(null),
+    ]);
+    view.customerName = maskPersonName(customerUser?.displayName);
+    view.customerAvatarUrl = customerUser?.avatarUrl ?? null;
+    view.driverName = maskPersonName(driverUser?.displayName);
+    view.driverAvatarUrl = driverUser?.avatarUrl ?? null;
     if (order.assignedDriverId === actor.userId) {
       view.cashPlan = await this.cashPlan(order);
     }

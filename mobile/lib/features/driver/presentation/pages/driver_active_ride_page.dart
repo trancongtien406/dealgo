@@ -35,7 +35,9 @@ import '../widgets/driver_widgets.dart';
 import '../widgets/driver_payment_collection.dart';
 import '../../../payment/data/driver_collection_api.dart';
 import '../../../../core/maps/map_lat_lng.dart';
+import '../../../../core/maps/map_markers.dart' show mapVehicleForClass;
 import '../../../../core/maps/map_port.dart';
+import '../widgets/driver_job_distance.dart' show driverLastFixOf;
 import '../../../live_location/domain/driver_location.dart';
 import '../../../live_location/presentation/server_phase_route.dart';
 import '../../../../core/design_system/icons/dealgo_icons.dart';
@@ -597,6 +599,7 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
                               lng: nextStop.point.lng,
                             ))
                     : pickup;
+                final driverFix = driverLastFixOf(context);
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -624,6 +627,15 @@ class _DriverActiveRidePageState extends State<DriverActiveRidePage>
                                   28,
                                 ),
                                 center: target,
+                                driver: driverFix == null
+                                    ? null
+                                    : MapLatLng(
+                                        lat: driverFix.lat,
+                                        lng: driverFix.lng,
+                                      ),
+                                driverVehicle: mapVehicleForClass(
+                                  ride.vehicleClassCode,
+                                ),
                                 markers: [
                                   pickup,
                                   for (final s in _stops)

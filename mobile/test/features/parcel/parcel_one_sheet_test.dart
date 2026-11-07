@@ -129,5 +129,76 @@ void main() {
     expect(picker.calls, 1);
     expect(find.text('0912345678'), findsOneWidget);
     expect(find.text('Bình'), findsOneWidget);
+
+    // Expand "more details"
+    expect(find.byKey(const Key('parcel-note')), findsNothing);
+    await tester.tap(find.byKey(const Key('parcel-more')));
+    await tester.pumpAndSettle();
+
+    // Verify fields appear and input works
+    expect(find.byKey(const Key('parcel-note')), findsOneWidget);
+    expect(find.byKey(const Key('parcel-weight')), findsOneWidget);
+    expect(find.byKey(const Key('parcel-item-photo')), findsOneWidget);
+
+    await tester.enterText(find.byKey(const Key('parcel-note')), 'Giao hàng cẩn thận');
+    await tester.pumpAndSettle();
+    expect(find.text('Giao hàng cẩn thận'), findsOneWidget);
+  });
+
+  testWidgets('more details fields adjust bottom inset for virtual keyboard when typing', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MultiRepositoryProvider(
+        providers: [
+          RepositoryProvider<ParcelClient>.value(value: FakeParcelClient()),
+          RepositoryProvider<ContactPicker>.value(value: _Picker()),
+        ],
+        child: BlocProvider<AuthCubit>(
+          create: (_) => _SignedIn(),
+          child: const MaterialApp(
+            locale: Locale('vi'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(body: ParcelDetailsPanel(places: _places)),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Expand "more details"
+    await tester.tap(find.byKey(const Key('parcel-more')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('parcel-weight')), findsOneWidget);
+    expect(find.byKey(const Key('parcel-note')), findsOneWidget);
+
+    // Simulate keyboard opening (bottom viewInsets)
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    // Focus and type in weight
+    await tester.ensureVisible(find.byKey(const Key('parcel-weight')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('parcel-weight')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('parcel-weight')), '2.5');
+    await tester.pumpAndSettle();
+    expect(find.text('2.5'), findsOneWidget);
+
+    // Focus and type in note
+    await tester.ensureVisible(find.byKey(const Key('parcel-note')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('parcel-note')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('parcel-note')), 'Hàng dễ vỡ');
+    await tester.pumpAndSettle();
+    expect(find.text('Hàng dễ vỡ'), findsOneWidget);
   });
 }

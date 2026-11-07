@@ -245,9 +245,53 @@ void main() {
     await tester.pumpAndSettle();
     expect(_activeDot(tester), 2);
 
+    // Looping continues forward: from last slide (dot 2) forward to first slide (dot 0) then dot 1.
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(_activeDot(tester), 0);
+
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(_activeDot(tester), 1);
+
     await tester.pump(const Duration(milliseconds: 200));
     expect(repo.recorded.map((e) => e.bannerId).toSet(), {'b1', 'b2', 'b3'});
   });
+
+  testWidgets(
+    'infinite looping wraps forward from last to first and backward from first to last',
+    (tester) async {
+      final repo = FakeHomeBannerRepository(banners: _banners);
+      await _pump(tester, repo);
+      await tester.pumpAndSettle();
+
+      expect(_activeDot(tester), 0);
+
+      // Swipe backward from first banner -> wraps to last banner (index 2)
+      await tester.drag(
+        find.byKey(const Key('home-banner-carousel')),
+        const Offset(500, 0),
+      );
+      await tester.pumpAndSettle();
+      expect(_activeDot(tester), 2);
+
+      // Swipe forward from last banner -> wraps to first banner (index 0)
+      await tester.drag(
+        find.byKey(const Key('home-banner-carousel')),
+        const Offset(-500, 0),
+      );
+      await tester.pumpAndSettle();
+      expect(_activeDot(tester), 0);
+
+      // Swipe forward again -> advances to second banner (index 1)
+      await tester.drag(
+        find.byKey(const Key('home-banner-carousel')),
+        const Offset(-500, 0),
+      );
+      await tester.pumpAndSettle();
+      expect(_activeDot(tester), 1);
+    },
+  );
 
   testWidgets('no autoplay and no impression while offstage', (tester) async {
     final repo = FakeHomeBannerRepository(banners: _banners);

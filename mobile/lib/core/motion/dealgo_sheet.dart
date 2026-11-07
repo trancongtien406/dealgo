@@ -24,7 +24,7 @@ Future<T?> showDealGoSheet<T>({
   bool isScrollControlled = false,
   Color? backgroundColor,
   bool useRootNavigator = false,
-  bool useSafeArea = false,
+  bool useSafeArea = true,
   bool isDismissible = true,
   bool enableDrag = true,
   ShapeBorder? shape,
@@ -178,10 +178,7 @@ class _DealGoDismissibleSheetState extends State<DealGoDismissibleSheet>
     final bgColor = widget.backgroundColor ?? DealGoColors.card;
     final isTransparent = bgColor.a == 0;
     final surface = isTransparent
-        ? Material(
-            type: MaterialType.transparency,
-            child: widget.child,
-          )
+        ? Material(type: MaterialType.transparency, child: widget.child)
         : Material(
             color: bgColor,
             surfaceTintColor: Colors.transparent,

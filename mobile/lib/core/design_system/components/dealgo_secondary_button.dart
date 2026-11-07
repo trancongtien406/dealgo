@@ -13,6 +13,7 @@ class DealGoSecondaryButton extends StatelessWidget {
     this.leadingIcon,
     this.tone = DealGoSecondaryTone.brand,
     this.compact = false,
+    this.fullWidth = false,
     super.key,
   });
 
@@ -22,6 +23,7 @@ class DealGoSecondaryButton extends StatelessWidget {
   final IconData? leadingIcon;
   final DealGoSecondaryTone tone;
   final bool compact;
+  final bool fullWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +31,7 @@ class DealGoSecondaryButton extends StatelessWidget {
         ? DealGoColors.danger
         : DealGoColors.primary;
     final text = DealGoButtonText(label);
-    return OutlinedButton(
+    final button = OutlinedButton(
       onPressed: enabled
           ? () {
               DealGoHaptics.selection();
@@ -41,7 +43,7 @@ class DealGoSecondaryButton extends StatelessWidget {
         elevation: const WidgetStatePropertyAll(0),
         minimumSize: WidgetStatePropertyAll(
           Size(
-            DealGoDimensions.minTapTarget,
+            fullWidth ? double.infinity : DealGoDimensions.minTapTarget,
             compact ? 48 : DealGoDimensions.buttonMinHeight,
           ),
         ),
@@ -96,6 +98,8 @@ class DealGoSecondaryButton extends StatelessWidget {
               ],
             ),
     );
+    if (!fullWidth) return button;
+    return SizedBox(width: double.infinity, child: button);
   }
 }
 

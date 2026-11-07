@@ -86,6 +86,9 @@ abstract interface class MerchantOrdersRepository {
     String? description,
     int? prepMinutes,
     String? menuCategoryId,
+    int? originalPriceVnd,
+    List<MerchantItemImageUpload>? newImages,
+    List<FoodOptionGroup>? optionGroups,
   });
 
   Future<FoodMenuItem> updateCatalogItem({
@@ -95,11 +98,22 @@ abstract interface class MerchantOrdersRepository {
     int? priceVnd,
     bool? available,
     String? description,
+    bool clearDescription = false,
     int? prepMinutes,
+    bool clearPrepMinutes = false,
     String? imageUrl,
+    List<String>? imageUrls,
+    List<MerchantItemImageUpload>? newImages,
     String? menuCategoryId,
+    bool clearMenuCategoryId = false,
     int? originalPriceVnd,
     bool clearOriginalPrice = false,
+    List<FoodOptionGroup>? optionGroups,
+  });
+
+  Future<void> deleteCatalogItem({
+    required String accessToken,
+    required String itemId,
   });
 
   Future<FoodMenuItem> replaceItemOptions({
@@ -140,6 +154,8 @@ abstract interface class MerchantOrdersRepository {
     int limit = 20,
     String? tab,
     String? q,
+    DateTime? from,
+    DateTime? to,
   });
 
   Future<List<MerchantMenuCategory>> reorderMenuCategories({

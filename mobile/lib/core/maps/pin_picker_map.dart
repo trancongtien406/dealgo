@@ -88,7 +88,10 @@ class _PinPickerMapState extends State<PinPickerMap> {
   void _moveTo(MapLatLng target, double? zoom) {
     if (widget.port is TileMapPort) {
       if (_ready) {
-        _map.move(LatLng(target.lat, target.lng), clampMapZoom(zoom ?? _map.camera.zoom));
+        _map.move(
+          LatLng(target.lat, target.lng),
+          clampMapZoom(zoom ?? _map.camera.zoom),
+        );
       } else {
         _pending = (target, zoom);
       }

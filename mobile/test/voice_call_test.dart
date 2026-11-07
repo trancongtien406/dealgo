@@ -5,6 +5,7 @@ import 'package:dealgo/core/network/api_exception.dart';
 import 'package:dealgo/features/voice/data/datasources/dio_voice_remote_datasource.dart';
 import 'package:dealgo/features/voice/data/datasources/fake_voice_client.dart';
 import 'package:dealgo/features/voice/data/media/fake_voice_media_engine.dart';
+import 'package:dealgo/features/voice/data/media/livekit_voice_media_engine.dart';
 import 'package:dealgo/features/voice/data/repositories/voice_repository_impl.dart';
 import 'package:dealgo/features/voice/domain/entities/voice_models.dart';
 import 'package:dealgo/features/voice/domain/ports/call_ringer.dart';
@@ -18,10 +19,15 @@ import 'package:dealgo/features/voice/presentation/cubit/voice_call_cubit.dart';
 import 'package:dealgo/features/voice/presentation/widgets/voice_call_host.dart';
 import 'package:dealgo/l10n/app_localizations.dart';
 import 'package:fake_async/fake_async.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+// Transitive dependency of livekit_client; reset WebRTC.initialized between tests.
+// ignore: depend_on_referenced_packages
+import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
 
 class _Harness {
   _Harness({bool micGranted = true, this._token = 'tok'})
@@ -547,4 +553,210 @@ void main() {
     }
     expect(callkitManifest, contains('CallkitConnectionService'));
   });
+
+  test(
+    'LiveKitVoiceMediaEngine initializes WebRTC before setEngineAvailability (Sentry FLUTTER-6)',
+    () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      const webrtcChannel = MethodChannel('FlutterWebRTC.Method');
+      const livekitChannel = MethodChannel('livekit_client');
+      var webrtcInitialized = false;
+      final calls = <String>[];
+      rtc.WebRTC.initialized = false;
+      messenger.setMockMethodCallHandler(webrtcChannel, (call) async {
+        calls.add('webrtc:${call.method}');
+        if (call.method == 'initialize') {
+          webrtcInitialized = true;
+          return '';
+        }
+        throw const _StopAfterAudioOwnership();
+      });
+      messenger.setMockMethodCallHandler(livekitChannel, (call) async {
+        calls.add('livekit:${call.method}');
+        if (call.method == 'setEngineAvailability') {
+          if (!webrtcInitialized) {
+            throw PlatformException(
+              code: 'setEngineAvailability',
+              message: 'audio device module is unavailable',
+            );
+          }
+          return null;
+        }
+        return true;
+      });
+      addTearDown(() {
+        messenger.setMockMethodCallHandler(webrtcChannel, null);
+        messenger.setMockMethodCallHandler(livekitChannel, null);
+        rtc.WebRTC.initialized = false;
+      });
+
+      final engine = LiveKitVoiceMediaEngine();
+      // Stopping once audio ownership succeeds (before opening a real socket)
+      // proves setEngineAvailability ran after WebRTC.initialize without error.
+      Object? caught;
+      try {
+        await engine.join(url: 'wss://livekit.dealgo.vn', token: 'tok');
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught, isNot(isA<PlatformException>()));
+      expect(webrtcInitialized, isTrue);
+      expect(
+        calls.indexOf('webrtc:initialize'),
+        lessThan(calls.indexOf('livekit:setEngineAvailability')),
+      );
+    },
+  );
+
+  test(
+    'LiveKitVoiceMediaEngine syncs CallKit audio gate on iOS after WebRTC initialize',
+    () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      const webrtcChannel = MethodChannel('FlutterWebRTC.Method');
+      const livekitChannel = MethodChannel('livekit_client');
+      const callkitAudioChannel = MethodChannel('dealgo/callkit_audio');
+      final calls = <String>[];
+      rtc.WebRTC.initialized = false;
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      messenger.setMockMethodCallHandler(webrtcChannel, (call) async {
+        calls.add('webrtc:${call.method}');
+        if (call.method == 'initialize') {
+          return '';
+        }
+        throw const _StopAfterAudioOwnership();
+      });
+      messenger.setMockMethodCallHandler(livekitChannel, (call) async {
+        calls.add('livekit:${call.method}');
+        return true;
+      });
+      messenger.setMockMethodCallHandler(callkitAudioChannel, (call) async {
+        calls.add('callkit_audio:${call.method}');
+        return true;
+      });
+      addTearDown(() {
+        debugDefaultTargetPlatformOverride = null;
+        messenger.setMockMethodCallHandler(webrtcChannel, null);
+        messenger.setMockMethodCallHandler(livekitChannel, null);
+        messenger.setMockMethodCallHandler(callkitAudioChannel, null);
+        rtc.WebRTC.initialized = false;
+      });
+
+      final engine = LiveKitVoiceMediaEngine();
+      try {
+        await engine.join(
+          url: 'wss://livekit.dealgo.vn',
+          token: 'tok',
+          systemCallOwnsAudio: true,
+        );
+      } catch (_) {}
+      expect(calls, contains('webrtc:initialize'));
+      expect(calls, contains('callkit_audio:syncCallKitAudioGate'));
+      expect(
+        calls.indexOf('webrtc:initialize'),
+        lessThan(calls.indexOf('callkit_audio:syncCallKitAudioGate')),
+      );
+      expect(calls, isNot(contains('livekit:setEngineAvailability')));
+    },
+  );
+
+  test(
+    'media join failure never flashes "noAnswer" when server emits MISSED during end()',
+    () async {
+      final events = StreamController<Map<String, Object?>>.broadcast();
+      final voice = _SocketEchoingVoiceClient(events);
+      final media = FakeVoiceMediaEngine()
+        ..joinError = PlatformException(
+          code: 'setEngineAvailability',
+          message: 'audio device module is unavailable',
+        );
+      final repo = VoiceRepositoryImpl(voice);
+      final cubit = VoiceCallCubit(
+        startVoiceCall: StartVoiceCall(repo),
+        answerVoiceCall: AnswerVoiceCall(repo),
+        endVoiceCall: EndVoiceCall(repo),
+        getVoiceCall: GetVoiceCall(repo),
+        getVoiceCallConfig: GetVoiceCallConfig(repo),
+        media: media,
+        callEvents: events.stream,
+        reconnects: const Stream.empty(),
+        accessToken: () => 'tok',
+        currentUserId: () => 'me',
+        endedHold: const Duration(seconds: 1),
+        ringGrace: Duration.zero,
+        peerGoneGrace: Duration.zero,
+      );
+      addTearDown(() async {
+        await cubit.close();
+        await events.close();
+      });
+
+      final notices = <VoiceCallNotice>[];
+      final sub = cubit.stream.listen((s) {
+        if (s.notice != null) {
+          notices.add(s.notice!);
+        }
+      });
+      addTearDown(sub.cancel);
+
+      await cubit.start(VoiceThreadKind.ride, 'ride-1');
+      await _settle();
+      expect(notices, [VoiceCallNotice.failed]);
+      expect(cubit.state.notice, VoiceCallNotice.failed);
+    },
+  );
+
+  test(
+    'caller MISSED with CANCELLED endReason maps to hungUp, while NO_ANSWER maps to noAnswer',
+    () async {
+      final h = _Harness();
+      addTearDown(h.dispose);
+      await h.cubit.start(VoiceThreadKind.ride, 'ride-1');
+      h.push(h.cubit.state.call!, status: 'MISSED', endReason: 'CANCELLED');
+      await _settle();
+      expect(h.cubit.state.notice, VoiceCallNotice.hungUp);
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await h.cubit.start(VoiceThreadKind.ride, 'ride-2');
+      h.push(h.cubit.state.call!, status: 'MISSED', endReason: 'NO_ANSWER');
+      await _settle();
+      expect(h.cubit.state.notice, VoiceCallNotice.noAnswer);
+    },
+  );
+}
+
+class _StopAfterAudioOwnership implements Exception {
+  const _StopAfterAudioOwnership();
+}
+
+class _SocketEchoingVoiceClient extends FakeVoiceClient {
+  _SocketEchoingVoiceClient(this._events);
+
+  final StreamController<Map<String, Object?>> _events;
+
+  @override
+  Future<VoiceCall> end({
+    required String accessToken,
+    required String callId,
+  }) async {
+    final ended = await super.end(accessToken: accessToken, callId: callId);
+    // Mirrors VoiceService.finishMissed on the backend: socket `MISSED` goes
+    // out before chat.recordCallNote + pushMissed finish and HTTP 200 returns.
+    _events.add({
+      'callId': ended.id,
+      'aggregateType': 'Ride',
+      'aggregateId': ended.aggregateId,
+      'status': 'MISSED',
+      'callerUserId': ended.callerUserId,
+      'calleeUserId': ended.calleeUserId,
+      'callerRole': 'CUSTOMER',
+      'ringUntil': ended.ringUntil.toIso8601String(),
+      'endReason': ended.endReason,
+    });
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+    return ended;
+  }
 }

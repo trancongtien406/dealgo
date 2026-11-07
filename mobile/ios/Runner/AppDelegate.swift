@@ -12,6 +12,8 @@ import livekit_client
   PKPushRegistryDelegate, CallkitIncomingAppDelegate
 {
   private var voipRegistry: PKPushRegistry?
+  private var callKitAudioSessionActive = false
+  private var callKitAudioChannel: FlutterMethodChannel?
   /// Last-resort CallKit reporter when the plugin is not attached yet.
   private lazy var fallbackProvider = CXProvider(configuration: CXProviderConfiguration())
   /// Same key flutter_callkit_incoming reads in getDevicePushTokenVoIP().
@@ -65,10 +67,17 @@ import livekit_client
     willPresent notification: UNNotification,
     withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
   ) {
-    let event = notification.request.content.userInfo["eventType"] as? String
+    let userInfo = notification.request.content.userInfo
+    let event = userInfo["eventType"] as? String
     if event == "Call.incoming" {
       completionHandler([])
       return
+    }
+    if event == "Call.missed",
+      let callId = userInfo["callId"] as? String,
+      !callId.isEmpty
+    {
+      SwiftFlutterCallkitIncomingPlugin.sharedInstance?.saveEndCall(callId, 3)
     }
     super.userNotificationCenter(
       center, willPresent: notification, withCompletionHandler: completionHandler)
@@ -76,11 +85,39 @@ import livekit_client
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    let channel = FlutterMethodChannel(
+      name: "dealgo/callkit_audio",
+      binaryMessenger: engineBridge.applicationRegistrar.messenger()
+    )
+    channel.setMethodCallHandler { [weak self] call, result in
+      guard let self = self else {
+        result(false)
+        return
+      }
+      if call.method == "syncCallKitAudioGate" {
+        LiveKitPlugin.setEngineAvailability(
+          isInputAvailable: self.callKitAudioSessionActive,
+          isOutputAvailable: self.callKitAudioSessionActive
+        )
+        result(self.callKitAudioSessionActive)
+      } else {
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    callKitAudioChannel = channel
   }
 
   // MARK: CallKit audio ownership
 
   func onAccept(_ call: Call, _ action: CXAnswerCallAction) {
+    // Configure category/mode without calling setActive; CallKit owns session
+    // activation and delivers didActivateAudioSession right after fulfill().
+    let session = AVAudioSession.sharedInstance()
+    try? session.setCategory(
+      .playAndRecord,
+      mode: .voiceChat,
+      options: [.allowBluetooth, .allowBluetoothA2DP]
+    )
     action.fulfill()
   }
 
@@ -95,6 +132,7 @@ import livekit_client
   func onTimeOut(_ call: Call) {}
 
   func didActivateAudioSession(_ audioSession: AVAudioSession) {
+    callKitAudioSessionActive = true
     LiveKitPlugin.setEngineAvailability(
       isInputAvailable: true,
       isOutputAvailable: true
@@ -102,6 +140,7 @@ import livekit_client
   }
 
   func didDeactivateAudioSession(_ audioSession: AVAudioSession) {
+    callKitAudioSessionActive = false
     LiveKitPlugin.setEngineAvailability(
       isInputAvailable: false,
       isOutputAvailable: false
@@ -109,6 +148,7 @@ import livekit_client
   }
 
   func providerDidReset() {
+    callKitAudioSessionActive = false
     LiveKitPlugin.setEngineAvailability(
       isInputAvailable: false,
       isOutputAvailable: false
@@ -155,6 +195,12 @@ import livekit_client
       completion()
       return
     }
+    if !callKitAudioSessionActive {
+      LiveKitPlugin.setEngineAvailability(
+        isInputAvailable: false,
+        isOutputAvailable: false
+      )
+    }
     // iOS 13+ terminates the app unless every VoIP push reports a call to
     // CallKit, so always show one (even for a malformed payload).
     let dict = payload.dictionaryPayload
@@ -188,6 +234,7 @@ import livekit_client
       "supportsVideo": false,
       "maximumCallGroups": 1,
       "maximumCallsPerCallGroup": 1,
+      "configureAudioSession": false,
       "audioSessionMode": "voiceChat",
       "audioSessionActive": true,
       "supportsDTMF": false,

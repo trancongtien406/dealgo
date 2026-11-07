@@ -15,6 +15,7 @@ class DealGoChip extends StatelessWidget {
     this.leading,
     this.selected = false,
     this.enabled = true,
+    this.borderRadius,
     this.onTap,
     super.key,
   });
@@ -25,6 +26,7 @@ class DealGoChip extends StatelessWidget {
   final Widget? leading;
   final bool selected;
   final bool enabled;
+  final BorderRadius? borderRadius;
   final VoidCallback? onTap;
 
   @override
@@ -36,7 +38,8 @@ class DealGoChip extends StatelessWidget {
     final horizontal = size == DealGoChipSize.sm
         ? DealGoSpacing.s8
         : DealGoSpacing.s12;
-    final shape = StadiumBorder(
+    final shape = RoundedRectangleBorder(
+      borderRadius: borderRadius ?? BorderRadius.circular(DealGoRadius.small),
       side: BorderSide(color: selected ? DealGoColors.primary : colors.border),
     );
 

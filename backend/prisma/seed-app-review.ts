@@ -164,15 +164,41 @@ export function appReviewId(...parts: string[]): string {
   return `${x.slice(0, 8)}-${x.slice(8, 12)}-${x.slice(12, 16)}-${x.slice(16, 20)}-${x.slice(20, 32)}`;
 }
 
+const LOCAL_DATABASE_URL =
+  'postgresql://dealgo:dealgo_dev@127.0.0.1:5433/dealgo?schema=public';
+
+export function loadDotEnv(): void {
+  const candidates = [resolve(process.cwd(), '.env'), resolve(process.cwd(), 'backend/.env')];
+  const envFile = candidates.find((c) => existsSync(c));
+  if (!envFile) return;
+  for (const raw of readFileSync(envFile, 'utf8').split('\n')) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#') || !line.includes('=')) continue;
+    const eq = line.indexOf('=');
+    const key = line.slice(0, eq).trim();
+    if (process.env[key] !== undefined) continue;
+    let value = line.slice(eq + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    process.env[key] = value;
+  }
+}
+
 export function appReviewDb(): PrismaClient {
-  const url = process.env.DATABASE_URL?.trim();
+  loadDotEnv();
+  const url = process.env.DATABASE_URL?.trim() || LOCAL_DATABASE_URL;
   if (!url) throw new Error('DATABASE_URL is required');
   return new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
 }
 
 async function main(): Promise<void> {
+  loadDotEnv();
   assertSeedAllowed(process.env);
-  const password = process.env.APP_REVIEW_PASSWORD?.trim() ?? '';
+  const password = process.env.APP_REVIEW_PASSWORD?.trim() || '123123123';
   if (password && password.length < 6) throw new Error('APP_REVIEW_PASSWORD must be at least 6 characters');
   const assetDir = resolve(process.cwd(), process.env.SEED_ASSET_DIR?.trim() || '../design/assets/batch02/png');
   const db = appReviewDb();
@@ -215,12 +241,15 @@ async function main(): Promise<void> {
     const now = new Date();
 
     // 1. User + credential + roles
-    const existing = await db.user.findUnique({ where: { email: APP_REVIEW_DEMO_EMAIL } });
+    const existing =
+      (await db.user.findUnique({ where: { id: appReviewId('user') } })) ??
+      (await db.user.findUnique({ where: { email: APP_REVIEW_DEMO_EMAIL } }));
     if (existing?.deletedAt) throw new Error('the review account is deleted; restore it in admin or run the cleanup first');
     const user = existing
       ? await db.user.update({
           where: { id: existing.id },
           data: {
+            email: APP_REVIEW_DEMO_EMAIL,
             displayName: APP_REVIEW_DISPLAY_NAME,
             emailVerifiedAt: existing.emailVerifiedAt ?? now,
             // Profile completion asks email accounts for a phone; reviewers skip it.
@@ -372,7 +401,7 @@ async function main(): Promise<void> {
       await db.user.upsert({
         where: { id: customerId },
         create: { id: customerId, email, displayName, emailVerifiedAt: now },
-        update: { displayName },
+        update: { email, displayName },
       });
       await db.roleGrant.upsert({
         where: { userId_role: { userId: customerId, role: 'CUSTOMER' } },

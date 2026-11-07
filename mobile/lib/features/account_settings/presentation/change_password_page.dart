@@ -112,7 +112,10 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                     ),
                     if (_error != null) ...[
                       const SizedBox(height: 12),
-                      Text(_error!, style: TextStyle(color: DealGoColors.danger)),
+                      Text(
+                        _error!,
+                        style: TextStyle(color: DealGoColors.danger),
+                      ),
                     ],
                     if (_ok != null) ...[
                       const SizedBox(height: 12),
@@ -122,7 +125,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                     DealGoPrimaryButton(
                       label: l10n.changePasswordSave,
                       isLoading: _busy,
-                      enabled: _current.text.isNotEmpty && _next.text.length >= 6,
+                      fullWidth: true,
+                      enabled:
+                          _current.text.isNotEmpty && _next.text.length >= 6,
                       onPressed: _save,
                     ),
                   ],

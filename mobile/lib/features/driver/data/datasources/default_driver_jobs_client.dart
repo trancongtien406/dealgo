@@ -19,6 +19,14 @@ class DefaultDriverJobsClient implements DriverJobsClient {
   }
 
   @override
+  Future<void> dismissRide({
+    required String accessToken,
+    required String rideId,
+  }) {
+    return rides.dismissRide(accessToken: accessToken, rideId: rideId);
+  }
+
+  @override
   Future<List<ReadyFoodJob>> listReadyOrders(String accessToken) {
     return food.listReadyOrders(accessToken);
   }

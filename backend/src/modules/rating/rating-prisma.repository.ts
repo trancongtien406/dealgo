@@ -110,18 +110,67 @@ export class PrismaRatingRepository implements RatingRepository {
     page: number,
     limit: number,
   ): Promise<{ items: ModeratedReviewRow[]; total: number }> {
+    const storeStarsWhere: Prisma.IntNullableFilter | number =
+      filter.stars !== undefined
+        ? filter.stars
+        : filter.maxStars !== undefined
+          ? { lte: filter.maxStars }
+          : { not: null };
+
+    const andClauses: Prisma.ServiceRatingWhereInput[] = [];
+    if (filter.replied !== undefined) {
+      andClauses.push(
+        filter.replied
+          ? { merchantReply: { not: null } }
+          : { OR: [{ merchantReply: null }, { merchantReply: '' }] },
+      );
+    }
+    if (filter.hasComment !== undefined) {
+      andClauses.push(
+        filter.hasComment
+          ? { AND: [{ comment: { not: null } }, { NOT: { comment: '' } }] }
+          : { OR: [{ comment: null }, { comment: '' }] },
+      );
+    }
+    if (filter.q?.trim()) {
+      const q = filter.q.trim();
+      andClauses.push({
+        OR: [
+          { comment: { contains: q, mode: 'insensitive' as const } },
+          { merchantReply: { contains: q, mode: 'insensitive' as const } },
+        ],
+      });
+    }
+    if (filter.from || filter.to) {
+      andClauses.push({
+        createdAt: {
+          ...(filter.from ? { gte: filter.from } : {}),
+          ...(filter.to ? { lte: filter.to } : {}),
+        },
+      });
+    }
+
     const where: Prisma.ServiceRatingWhereInput = {
       storeId: filter.storeId ?? { not: null },
-      storeStars: filter.maxStars === undefined ? { not: null } : { lte: filter.maxStars },
+      storeStars: storeStarsWhere,
       ...(filter.hidden === undefined ? {} : { hiddenAt: filter.hidden ? { not: null } : null }),
-      ...(filter.q?.trim()
-        ? { comment: { contains: filter.q.trim(), mode: 'insensitive' as const } }
-        : {}),
+      ...(filter.tag ? { tags: { has: filter.tag } } : {}),
+      ...(andClauses.length > 0 ? { AND: andClauses } : {}),
     };
+
+    const orderBy: Prisma.ServiceRatingOrderByWithRelationInput[] =
+      filter.sort === 'OLDEST'
+        ? [{ createdAt: 'asc' }, { id: 'asc' }]
+        : filter.sort === 'LOWEST_STARS'
+          ? [{ storeStars: 'asc' }, { createdAt: 'desc' }, { id: 'desc' }]
+          : filter.sort === 'HIGHEST_STARS'
+            ? [{ storeStars: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }]
+            : [{ createdAt: 'desc' }, { id: 'desc' }];
+
     const [rows, total] = await Promise.all([
       this.db.serviceRating.findMany({
         where,
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        orderBy,
         skip: (page - 1) * limit,
         take: limit,
         select: REVIEW_SELECT,

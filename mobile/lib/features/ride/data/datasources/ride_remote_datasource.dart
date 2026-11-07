@@ -7,6 +7,11 @@ import '../models/ride_models.dart';
 abstract interface class RideRemoteDataSource {
   Future<List<OpenRideModel>> listOpenRides(String accessToken);
 
+  Future<void> dismissRide({
+    required String accessToken,
+    required String rideId,
+  });
+
   Future<RideViewModel> submitOffer(SubmitRideOfferParams request);
 
   Future<RideViewModel> createRide(CreateRideParams request);

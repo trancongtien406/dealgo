@@ -170,7 +170,6 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final textTheme = Theme.of(context).textTheme;
     final page = _page;
     final active = page?.activeCount ?? 0;
     final done = page?.doneCount ?? 0;
@@ -189,103 +188,111 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
                 icon: const Icon(DealGoIcons.add, color: DealGoColors.primary),
               ),
             ),
-            Expanded(
-              child: DealGoRefresh(
-                onRefresh: _load,
-                child: ListView(
-                  controller: _scroll,
-                  padding: const EdgeInsets.fromLTRB(
-                    DealGoDimensions.pageGutter,
-                    DealGoSpacing.s16,
-                    DealGoDimensions.pageGutter,
-                    DealGoSpacing.s16,
-                  ),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: DealGoDimensions.pageGutter,
+                vertical: DealGoSpacing.s8,
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
                   children: [
-                    Text(
-                      l10n.supportListHeading,
-                      style: textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: DealGoSpacing.s16),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          for (final (filter, label) in [
-                            (
-                              SupportListFilter.all,
-                              l10n.supportFilterAll(active + done),
-                            ),
-                            (
-                              SupportListFilter.active,
-                              l10n.supportFilterActive(active),
-                            ),
-                            (
-                              SupportListFilter.done,
-                              l10n.supportFilterDone(done),
-                            ),
-                          ]) ...[
-                            AccountFilterChip(
-                              key: Key('support-filter-${filter.name}'),
-                              label: label,
-                              selected: _filter == filter,
-                              onSelected: () {
-                                if (_filter == filter) return;
-                                setState(() => _filter = filter);
-                                _load();
-                              },
-                            ),
-                            const SizedBox(width: DealGoSpacing.s8),
-                          ],
-                        ],
+                    for (final (filter, label) in [
+                      (
+                        SupportListFilter.all,
+                        l10n.supportFilterAll(active + done),
                       ),
-                    ),
-                    const SizedBox(height: DealGoSpacing.s16),
-                    if (_loading && page == null)
-                      const DealGoSkeletonList(itemCount: 3)
-                    else if (_failure != null)
-                      DealGoStateView.failure(
+                      (
+                        SupportListFilter.active,
+                        l10n.supportFilterActive(active),
+                      ),
+                      (
+                        SupportListFilter.done,
+                        l10n.supportFilterDone(done),
+                      ),
+                    ]) ...[
+                      AccountFilterChip(
+                        key: Key('support-filter-${filter.name}'),
+                        label: label,
+                        selected: _filter == filter,
+                        onSelected: () {
+                          if (_filter == filter) return;
+                          setState(() => _filter = filter);
+                          _load();
+                        },
+                      ),
+                      const SizedBox(width: DealGoSpacing.s8),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            Expanded(
+              child: _loading && page == null
+                  ? const DealGoSkeletonList(itemCount: 3)
+                  : _failure != null
+                  ? DealGoRefresh(
+                      onRefresh: _load,
+                      child: DealGoStateView.failure(
                         context,
                         onRetry: _load,
                         cause: _failure,
                         message: l10n.supportListLoadFailed,
-                        compact: true,
-                      )
-                    else if (page == null || page.items.isEmpty)
-                      DealGoStateView(
+                      ),
+                    )
+                  : (page == null || page.items.isEmpty)
+                  ? DealGoRefresh(
+                      onRefresh: _load,
+                      child: DealGoStateView(
                         art: DealGoStateArt.noMessages,
                         title: l10n.supportListEmptyTitle,
                         message: l10n.supportListEmptyBody,
-                        compact: true,
-                      )
-                    else
-                      for (final ticket in page.items) ...[
-                        _TicketCard(ticket: ticket, onTap: () => _open(ticket)),
-                        const SizedBox(height: DealGoSpacing.s12),
-                      ],
-                    if (_loadingMore)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                            vertical: DealGoSpacing.s12,
-                          ),
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        ),
-                      )
-                    else if (_loadMoreFailed)
-                      Center(
-                        child: TextButton(
-                          key: const Key('support-more-retry'),
-                          onPressed: _loadMore,
-                          child: Text(l10n.actionRetry),
-                        ),
                       ),
-                  ],
-                ),
-              ),
+                    )
+                  : DealGoRefresh(
+                      onRefresh: _load,
+                      child: ListView(
+                        controller: _scroll,
+                        padding: const EdgeInsets.fromLTRB(
+                          DealGoDimensions.pageGutter,
+                          DealGoSpacing.s8,
+                          DealGoDimensions.pageGutter,
+                          DealGoSpacing.s16,
+                        ),
+                        children: [
+                          for (final ticket in page.items) ...[
+                            _TicketCard(
+                              ticket: ticket,
+                              onTap: () => _open(ticket),
+                            ),
+                            const SizedBox(height: DealGoSpacing.s12),
+                          ],
+                          if (_loadingMore)
+                            const Center(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                  vertical: DealGoSpacing.s12,
+                                ),
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
+                            )
+                          else if (_loadMoreFailed)
+                            Center(
+                              child: TextButton(
+                                key: const Key('support-more-retry'),
+                                onPressed: _loadMore,
+                                child: Text(l10n.actionRetry),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(
@@ -297,6 +304,7 @@ class _SupportTicketsPageState extends State<SupportTicketsPage> {
               child: DealGoPrimaryButton(
                 key: const Key('support-new-button'),
                 label: l10n.supportNewTicket,
+                fullWidth: true,
                 onPressed: _create,
               ),
             ),

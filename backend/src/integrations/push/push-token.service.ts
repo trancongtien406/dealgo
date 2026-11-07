@@ -58,6 +58,17 @@ export class PushTokenService {
     return { unregistered: true };
   }
 
+  /** Forget all device tokens registered for a user (called on full sign-out or account deletion). */
+  async unregisterAll(userId: string): Promise<{ unregistered: true }> {
+    const db = this.prisma.db();
+    if (!db) {
+      this.memory.delete(userId);
+      return { unregistered: true };
+    }
+    await db.pushDeviceToken.deleteMany({ where: { userId } });
+    return { unregistered: true };
+  }
+
   /** FCM says the token is dead (app uninstalled / token rotated): drop it for everyone. */
   async forget(token: string): Promise<void> {
     const db = this.prisma.db();
@@ -92,6 +103,21 @@ export class PushTokenService {
         .filter(([, platform]) => (platform === VOIP_PUSH_PLATFORM) === voip)
         .filter(([, platform]) => !skipPlatforms.includes(platform))
         .map(([token]) => token);
+    }
+    // When the database session model is available, ensure the user has at least one active,
+    // unexpired session before returning push tokens (a fully logged-out user receives no pushes).
+    if (db.session?.findFirst) {
+      const activeSession = await db.session.findFirst({
+        where: {
+          userId,
+          revokedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        select: { id: true },
+      });
+      if (!activeSession) {
+        return [];
+      }
     }
     const rows = await db.pushDeviceToken.findMany({
       where: voip

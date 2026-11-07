@@ -110,6 +110,38 @@ List<AccountSession> decodeAccountSessions(Object? raw) {
   ];
 }
 
+/// One passkey bound to the account (no key material). [backedUp] means the
+/// platform syncs it (iCloud Keychain / Google Password Manager).
+class AccountPasskey {
+  const AccountPasskey({
+    required this.id,
+    required this.createdAt,
+    required this.backedUp,
+    this.deviceType,
+  });
+
+  final String id;
+  final DateTime createdAt;
+  final bool backedUp;
+  final String? deviceType;
+}
+
+List<AccountPasskey> decodeAccountPasskeys(Object? raw) {
+  final list = raw is List ? raw : const [];
+  return [
+    for (final entry in list)
+      if (entry is Map)
+        AccountPasskey(
+          id: '${entry['id']}',
+          createdAt:
+              DateTime.tryParse('${entry['createdAt'] ?? ''}') ??
+              DateTime.now(),
+          backedUp: entry['backedUp'] == true,
+          deviceType: entry['deviceType'] as String?,
+        ),
+  ];
+}
+
 abstract class AccountSettingsRepository {
   Future<NotificationPrefs> notificationPrefs({required String accessToken});
   Future<NotificationPrefs> saveNotificationPrefs({
@@ -140,6 +172,11 @@ abstract class AccountSettingsRepository {
   });
 
   /// S025 passkey enrolment (existing `/v1/auth/passkeys/registration/*` endpoints).
+  Future<List<AccountPasskey>> passkeys({required String accessToken});
+  Future<void> deletePasskey({
+    required String accessToken,
+    required String passkeyId,
+  });
   Future<Map<String, Object?>> passkeyRegistrationOptions({
     required String accessToken,
   });

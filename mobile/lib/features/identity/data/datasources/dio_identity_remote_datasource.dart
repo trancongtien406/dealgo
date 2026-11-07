@@ -113,10 +113,7 @@ class DioIdentityRemoteDataSource implements IdentityRemoteDataSource {
       body['deviceId'] = deviceId;
     }
     return _request(
-      () => dio.post<Object?>(
-        ApiPaths.emailLogin,
-        data: body,
-      ),
+      () => dio.post<Object?>(ApiPaths.emailLogin, data: body),
       VerifiedSessionModel.fromJson,
     );
   }

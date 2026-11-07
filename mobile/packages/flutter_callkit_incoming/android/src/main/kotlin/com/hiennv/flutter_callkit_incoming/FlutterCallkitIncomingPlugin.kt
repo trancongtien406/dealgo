@@ -336,7 +336,7 @@ class FlutterCallkitIncomingPlugin : FlutterPlugin, MethodCallHandler, ActivityA
                 "endCall" -> {
                     val calls = getDataActiveCalls(context)
                     val data = Data(call.arguments() ?: HashMap())
-                    val currentCall = calls.firstOrNull { it.id == data.id }
+                    val currentCall = calls.firstOrNull { it.id.equals(data.id, ignoreCase = true) }
                     if (currentCall != null && context != null) {
                         if(currentCall.isAccepted) {
                             context?.sendBroadcast(
@@ -353,6 +353,10 @@ class FlutterCallkitIncomingPlugin : FlutterPlugin, MethodCallHandler, ActivityA
                                 )
                             )
                         }
+                    } else if (data.id.isNotEmpty() && context != null) {
+                        // Fallback if the call UI / activity is up before or after activeCalls sync.
+                        callkitSoundPlayerManager?.stop()
+                        callkitNotificationManager?.clearIncomingNotification(data.toBundle(), false)
                     }
                     reply.success(true)
                 }
@@ -360,7 +364,7 @@ class FlutterCallkitIncomingPlugin : FlutterPlugin, MethodCallHandler, ActivityA
                 "callConnected" -> {
                     val calls = getDataActiveCalls(context)
                     val data = Data(call.arguments() ?: HashMap())
-                    val currentCall = calls.firstOrNull { it.id == data.id }
+                    val currentCall = calls.firstOrNull { it.id.equals(data.id, ignoreCase = true) }
                     if (currentCall != null && context != null) {
                         context?.sendBroadcast(
                             CallkitIncomingBroadcastReceiver.getIntentConnected(
@@ -487,11 +491,14 @@ class FlutterCallkitIncomingPlugin : FlutterPlugin, MethodCallHandler, ActivityA
         eventChannels.remove(binding.binaryMessenger)?.setStreamHandler(null)
         eventHandlers.remove(binding.binaryMessenger)
 
-        // Only destroy and null the shared managers when the LAST engine detaches.
-        // When multiple engines are attached (e.g. main UI engine + FCM background
-        // isolate engine), tearing down the main engine must not pull the managers
-        // out from under the background isolate that still needs them.
-        if (methodChannels.isEmpty() && eventChannels.isEmpty()) {
+        // Only destroy and null the shared managers when the LAST engine detaches
+        // AND no incoming/ongoing call is still ringing or active. Otherwise an FCM
+        // background isolate detaching right after showCallkitIncoming on a killed
+        // app would stop the ringtone immediately.
+        if (methodChannels.isEmpty() &&
+            eventChannels.isEmpty() &&
+            getDataActiveCalls(binding.applicationContext).isEmpty()
+        ) {
             instance.callkitSoundPlayerManager?.destroy()
             instance.callkitNotificationManager?.destroy()
             instance.callkitSoundPlayerManager = null

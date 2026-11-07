@@ -333,7 +333,9 @@ class OtpEntryPane extends StatelessWidget {
                           ),
                           decoration: BoxDecoration(
                             color: DealGoColors.subtlePurple,
-                            borderRadius: BorderRadius.circular(DealGoRadius.input),
+                            borderRadius: BorderRadius.circular(
+                              DealGoRadius.input,
+                            ),
                             border: Border.all(
                               color: DealGoColors.border.withValues(alpha: 0.6),
                             ),

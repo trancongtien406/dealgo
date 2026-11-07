@@ -8,6 +8,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 /// directly, so swapping a glyph is a one-line change.
 abstract final class DealGoIcons {
   static const IconData add = LucideIcons.plus;
+  static const IconData smartphone = LucideIcons.smartphone;
+  static const IconData laptop = LucideIcons.laptop;
+  static const IconData trash = LucideIcons.trash2;
   static const IconData addCircle = LucideIcons.circlePlus;
   static const IconData addPhoto = LucideIcons.imagePlus;
   static const IconData note = LucideIcons.messageSquareText;
@@ -44,6 +47,7 @@ abstract final class DealGoIcons {
   static const IconData delivery = LucideIcons.package;
   static const IconData devices = LucideIcons.monitorSmartphone;
   static const IconData document = LucideIcons.fileText;
+  static const IconData dragHandle = LucideIcons.gripVertical;
   static const IconData deleteAccount = LucideIcons.userX;
   static const IconData image = LucideIcons.image;
   static const IconData paperclip = LucideIcons.paperclip;

@@ -36,8 +36,7 @@ class DealGoDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final isDanger = primaryTone == DealGoDialogPrimaryTone.danger;
-    final effectiveIcon =
-        icon ?? (isDanger ? DealGoIcons.warning : null);
+    final effectiveIcon = icon ?? (isDanger ? DealGoIcons.warning : null);
     final badgeBg = isDanger
         ? DealGoColors.dangerSurface
         : DealGoColors.subtlePurple;
@@ -74,9 +73,7 @@ class DealGoDialog extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: badgeBg,
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: badgeFg.withValues(alpha: 0.2),
-                    ),
+                    border: Border.all(color: badgeFg.withValues(alpha: 0.2)),
                   ),
                   child: Icon(effectiveIcon, color: badgeFg, size: 22),
                 ),

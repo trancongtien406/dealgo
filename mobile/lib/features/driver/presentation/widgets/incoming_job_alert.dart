@@ -18,6 +18,7 @@ import '../../../ride/domain/entities/ride_models.dart';
 import '../../../ride/domain/entities/ride_money.dart';
 import '../cubit/driver_duty_cubit.dart';
 import '../cubit/driver_feed_cubit.dart';
+import '../../domain/repositories/driver_jobs_repository.dart';
 import '../utils/driver_routes.dart';
 import '../../../ride/presentation/widgets/ride_negotiation_ui.dart';
 import 'driver_inline_quote.dart';
@@ -85,6 +86,7 @@ class IncomingJobAlertHost extends StatefulWidget {
     this.ringer,
     this.clock,
     this.inCall,
+    this.accessToken,
   });
 
   /// Off in widget tests that drive the job list directly (flutter_test_config);
@@ -95,6 +97,7 @@ class IncomingJobAlertHost extends StatefulWidget {
   final IncomingJobRinger? ringer;
   final DateTime Function()? clock;
   final bool Function()? inCall;
+  final String? Function()? accessToken;
 
   @override
   State<IncomingJobAlertHost> createState() => _IncomingJobAlertHostState();
@@ -158,7 +161,7 @@ class _IncomingJobAlertHostState extends State<IncomingJobAlertHost> {
     String? token;
     try {
       online = context.read<DriverDutyCubit>().state;
-      token = driverAccessToken(context);
+      token = (widget.accessToken ?? () => driverAccessToken(context))();
     } catch (_) {
       return; // Not under the signed-in driver scope (tests / sign-out).
     }
@@ -235,9 +238,27 @@ class _IncomingJobAlertHostState extends State<IncomingJobAlertHost> {
   void _skip() {
     final c = _current;
     if (c == null) return;
+    final token = (widget.accessToken ?? () => driverAccessToken(context))();
+    if (token == null) return;
     _handled.add(c.id);
     _dismiss();
     _evaluate(context.read<DriverFeedCubit>().state);
+    unawaited(_persistSkip(c.id, token));
+  }
+
+  Future<void> _persistSkip(String rideId, String accessToken) async {
+    try {
+      await context.read<DriverJobsRepository>().dismissRide(
+        accessToken: accessToken,
+        rideId: rideId,
+      );
+      if (mounted) _refresh();
+    } catch (_) {
+      // The server is authoritative. Undo the optimistic suppression so a failed
+      // dismiss cannot silently hide a request only on this device.
+      _handled.remove(rideId);
+      if (mounted) _refresh();
+    }
   }
 
   void _sentInline(int _) {

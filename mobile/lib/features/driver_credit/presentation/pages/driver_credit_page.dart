@@ -154,16 +154,10 @@ class _DriverCreditViewState extends State<_DriverCreditView>
     if (state.status == DriverCreditStatus.failed && state.credit == null) {
       return DealGoRefresh(
         onRefresh: cubit.load,
-        child: ListView(
-          padding: _padding,
-          children: [
-            DealGoStateView.failure(
-              context,
-              onRetry: cubit.load,
-              cause: state.cause,
-              compact: true,
-            ),
-          ],
+        child: DealGoStateView.failure(
+          context,
+          onRetry: cubit.load,
+          cause: state.cause,
         ),
       );
     }
@@ -327,7 +321,10 @@ class _AmountPicker extends StatelessWidget {
     const quick = [50_000, 100_000, 200_000, 500_000, 1_000_000, 2_000_000];
     final min = credit.minVnd > 0 ? credit.minVnd : 10_000;
     final max = credit.maxVnd > 0 ? credit.maxVnd : min;
-    final values = <int>{min, if (min <= max) ...quick.where((v) => v >= min && v <= max)};
+    final values = <int>{
+      min,
+      if (min <= max) ...quick.where((v) => v >= min && v <= max),
+    };
     return values.toList()..sort();
   }
 
@@ -391,9 +388,8 @@ class _PendingCard extends StatelessWidget {
     final expiresAt = pending.expiresAt;
     final expires = expiresAt == null
         ? null
-        : DateFormat.Hm(
-            Localizations.localeOf(context).toLanguageTag(),
-          ).format(expiresAt);
+        : DateFormat.Hm(Localizations.localeOf(context).toLanguageTag())
+              .format(expiresAt);
     return DealGoCard(
       key: const Key('driver-credit-pending'),
       child: Column(

@@ -18,11 +18,7 @@ class DealGoImageCache {
   static const int maxObjects = 300;
 
   static final CacheManager manager = CacheManager(
-    Config(
-      cacheKey,
-      stalePeriod: stalePeriod,
-      maxNrOfCacheObjects: maxObjects,
-    ),
+    Config(cacheKey, stalePeriod: stalePeriod, maxNrOfCacheObjects: maxObjects),
   );
 
   /// Provider for [url], decoded at [decodeWidth] physical pixels when given.

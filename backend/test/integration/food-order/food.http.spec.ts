@@ -1153,7 +1153,9 @@ describe('food order http', () => {
       customerName: maskPersonName(
         (await repository.findUserById(customer.userId))?.displayName,
       ),
+      customerAvatarUrl: null,
       driverName: null,
+      driverAvatarUrl: null,
     });
     expect(JSON.stringify(listed.body.data)).not.toContain('"phone"');
     expect(JSON.stringify(listed.body.data)).not.toContain(customer.userId);
@@ -1623,6 +1625,91 @@ describe('food order http', () => {
       .send({ available: true });
     expect(denied.status).toBe(403);
     expect(denied.body.errorCode).toBe('FOOD_NOT_STORE_OWNER');
+
+    // Unified form create with newImages + originalPriceVnd + optionGroups, then update & delete
+    const onePixelPng =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    const rich = await request(app.getHttpServer())
+      .post('/v1/food/merchant/items')
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({
+        name: 'Bún Chả Cá',
+        priceVnd: 40_000,
+        originalPriceVnd: 50_000,
+        description: 'Chả cá thu Đà Nẵng',
+        prepMinutes: 15,
+        available: true,
+        newImages: [{ contentBase64: onePixelPng, contentType: 'image/png' }],
+        optionGroups: [
+          {
+            name: 'Tô',
+            minSelect: 1,
+            maxSelect: 1,
+            options: [
+              { name: 'Thường', priceDeltaVnd: 0 },
+              { name: 'Đặc biệt', priceDeltaVnd: 15_000 },
+            ],
+          },
+        ],
+      })
+      .expect(200);
+    const richId = rich.body.data.id as string;
+    expect(rich.body.data.originalPriceVnd).toBe(50_000);
+    expect(rich.body.data.imageUrls).toHaveLength(1);
+    expect(rich.body.data.optionGroups).toHaveLength(1);
+    const firstPhoto = rich.body.data.imageUrls[0] as string;
+
+    // Unified form update: keep first photo + add second photo + clear originalPriceVnd/prepMinutes
+    const richUpdated = await request(app.getHttpServer())
+      .patch(`/v1/food/merchant/items/${richId}`)
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({
+        name: 'Bún Chả Cá Đặc Biệt',
+        priceVnd: 45_000,
+        originalPriceVnd: null,
+        prepMinutes: null,
+        description: null,
+        imageUrls: [firstPhoto],
+        newImages: [{ contentBase64: onePixelPng, contentType: 'image/png' }],
+      })
+      .expect(200);
+    expect(richUpdated.body.data.originalPriceVnd).toBeNull();
+    expect(richUpdated.body.data.prepMinutes).toBeNull();
+    expect(richUpdated.body.data.description).toBeNull();
+    expect(richUpdated.body.data.imageUrls).toHaveLength(2);
+    expect(richUpdated.body.data.imageUrls[0]).toBe(firstPhoto);
+
+    // Unified form update: remove first photo, keep only second photo
+    const secondPhoto = richUpdated.body.data.imageUrls[1] as string;
+    const afterRemoveOne = await request(app.getHttpServer())
+      .patch(`/v1/food/merchant/items/${richId}`)
+      .set('Authorization', `Bearer ${owner.token}`)
+      .send({
+        imageUrls: [secondPhoto],
+      })
+      .expect(200);
+    expect(afterRemoveOne.body.data.imageUrls).toEqual([secondPhoto]);
+    expect(afterRemoveOne.body.data.imageUrl).toBe(secondPhoto);
+
+    // Delete item
+    const deleteDenied = await request(app.getHttpServer())
+      .delete(`/v1/food/merchant/items/${richId}`)
+      .set('Authorization', `Bearer ${other.token}`);
+    expect(deleteDenied.status).toBe(403);
+
+    const deleted = await request(app.getHttpServer())
+      .delete(`/v1/food/merchant/items/${richId}`)
+      .set('Authorization', `Bearer ${owner.token}`)
+      .expect(200);
+    expect(deleted.body.data).toEqual({ deleted: true, id: richId });
+
+    const catalogAfter = await request(app.getHttpServer())
+      .get('/v1/food/merchant/catalog')
+      .set('Authorization', `Bearer ${owner.token}`)
+      .expect(200);
+    expect(
+      catalogAfter.body.data.items.some((i: { id: string }) => i.id === richId),
+    ).toBe(false);
   });
 
   it('persists ops catalog approve/reject and ignores client delivery fare', async () => {

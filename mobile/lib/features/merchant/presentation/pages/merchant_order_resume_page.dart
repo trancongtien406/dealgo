@@ -3,7 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/design_system/components/dealgo_skeleton.dart';
 import '../../../../l10n/app_localizations.dart';
+import '../../../food/domain/entities/food_models.dart';
+import '../../domain/params/merchant_order_action_params.dart';
+import '../../domain/usecases/get_merchant_order.dart';
 import '../cubit/merchant_queue_cubit.dart';
 import '../widgets/merchant_widgets.dart';
 import 'merchant_order_page.dart';
@@ -31,6 +35,7 @@ class MerchantOrderResumePage extends StatefulWidget {
 
 class _MerchantOrderResumePageState extends State<MerchantOrderResumePage> {
   bool _requested = false;
+  FoodOrderDetail? _detail;
 
   @override
   void initState() {
@@ -43,21 +48,32 @@ class _MerchantOrderResumePageState extends State<MerchantOrderResumePage> {
       return;
     }
     final queue = context.read<MerchantQueueCubit>();
-    // A queue loaded before the app went to the background misses orders
-    // placed since (the store socket is paused), so a push for a brand-new
-    // order must refetch instead of showing "not found".
-    final stale =
-        queue.state is! MerchantQueueLoading &&
-        merchantOrderFrom(queue.state, widget.orderId) == null;
-    if (queue.state is! MerchantQueueLoading && !stale) {
+    final inQueue = merchantOrderFrom(queue.state, widget.orderId) != null;
+    if (inQueue) {
       return;
     }
     _requested = true;
+    final token = widget.accessToken(context);
     queue.setTokenSource(() {
       if (!mounted) return null;
       return widget.accessToken(context);
     });
-    unawaited(queue.load(widget.accessToken(context)));
+    unawaited(queue.load(token));
+    if (token != null && token.isNotEmpty) {
+      unawaited(_loadDetail(token));
+    }
+  }
+
+  Future<void> _loadDetail(String token) async {
+    try {
+      final getOrder = context.read<GetMerchantOrder>();
+      final detail = await getOrder(
+        MerchantOrderActionParams(accessToken: token, orderId: widget.orderId),
+      );
+      if (mounted) {
+        setState(() => _detail = detail);
+      }
+    } catch (_) {}
   }
 
   @override
@@ -68,12 +84,31 @@ class _MerchantOrderResumePageState extends State<MerchantOrderResumePage> {
         if (order != null) {
           return MerchantOrderPage(order: order);
         }
-        if (state is MerchantQueueLoading) {
+        if (_detail != null) {
+          final d = _detail!;
+          return MerchantOrderPage(
+            order: MerchantQueueOrder(
+              id: d.id,
+              storeId: d.storeId ?? '',
+              status: d.status,
+              deliveryFareVnd: d.deliveryFareVnd,
+              subtotalVnd: d.subtotalVnd,
+              totalVnd: d.totalVnd,
+              dropoff: d.dropoff,
+              lineCount: d.lines.length,
+              createdAt: d.estimatedReadyAt?.toIso8601String() ?? '',
+            ),
+          );
+        }
+        if (state is MerchantQueueLoading && _detail == null) {
           return Scaffold(
             body: MerchantPageFrame(
               title: AppLocalizations.of(context).merchantOrderTitle,
               insetBottom: true,
-              body: const Center(child: CircularProgressIndicator()),
+              body: const Padding(
+                padding: merchantPagePadding,
+                child: DealGoSkeletonList(itemCount: 4),
+              ),
             ),
           );
         }

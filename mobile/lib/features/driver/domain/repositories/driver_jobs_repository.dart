@@ -7,6 +7,11 @@ import '../../../ride/domain/params/ride_driver_action.dart';
 abstract interface class DriverJobsRepository {
   Future<List<OpenRide>> listOpenRides(String accessToken);
 
+  Future<void> dismissRide({
+    required String accessToken,
+    required String rideId,
+  });
+
   Future<List<ReadyFoodJob>> listReadyOrders(String accessToken);
 
   Future<RideView> submitOffer(SubmitRideOfferRequest request);
