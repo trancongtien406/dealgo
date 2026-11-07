@@ -77,7 +77,9 @@ export async function GET(request: Request) {
     limit?: number;
     counts?: { active?: number; pending?: number; suspended?: number };
   };
-  const items: PersonItem[] = (upstreamData.items ?? []).map((u) => {
+  const items: PersonItem[] = (upstreamData.items ?? [])
+    .filter((u) => u.superAdmin !== true)
+    .map((u) => {
     const words = (u.displayName || u.email || "Staff")
       .split(/\s+/)
       .filter(Boolean);

@@ -38,7 +38,7 @@ async function main() {
   const expiresIn = 3600 * 24 * 7; // 7 days
   const secret = accessSecret({
     JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET,
-    NODE_ENV: process.env.NODE_ENV,
+    NODE_ENV: (process.env.NODE_ENV as 'test' | 'development' | 'production') ?? 'development',
   });
 
   const accessToken = signAccessToken(
