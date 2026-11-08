@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -63,13 +64,20 @@ class _FoodCheckoutPageState extends State<_FoodCheckoutView> {
     final snapshot = cart.state;
     final held = retry ? _attempt : null;
     if (held == null && !snapshot.canCheckout) {
-      setState(() {
-        _phase = CheckoutRejected(
+      // Keep the editing body mounted. Switching to CheckoutRejected rebuilds
+      // the receipt and resets its scroll position to the top, even though the
+      // recovery action lives beside the sticky checkout button.
+      final message =
           checkoutBlockingMessage(snapshot, AppLocalizations.of(context)) ??
-              AppLocalizations.of(context).checkoutErrGeneric,
-        );
-      });
-      _announceRejection();
+          AppLocalizations.of(context).checkoutErrGeneric;
+      // The sticky action area already presents this message as a live region.
+      // Avoid a snackbar here: the app theme makes it floating and a tall
+      // checkout footer can leave no safe space for it on compact screens.
+      SemanticsService.sendAnnouncement(
+        View.of(context),
+        message,
+        Directionality.of(context),
+      );
       return;
     }
     final attempt =

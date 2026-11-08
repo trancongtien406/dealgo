@@ -49,6 +49,21 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(FoodCheckoutPage), findsOneWidget);
 
+      final checkoutBar = find.byType(CheckoutActions);
+      expect(
+        tester.getSize(checkoutBar).height,
+        lessThan(180),
+        reason: 'the sticky checkout bar must not expand over the whole screen',
+      );
+      expect(
+        tester.getRect(find.byKey(const Key('food-place-order'))).bottom,
+        greaterThan(
+          tester.view.physicalSize.height / tester.view.devicePixelRatio / 2,
+        ),
+        reason:
+            'the place-order button must stay in the lower half of the screen',
+      );
+
       final tile = find.byType(PaymentMethodTile);
       final scrollable = find
           .descendant(
@@ -79,6 +94,71 @@ void main() {
         ),
         isTrue,
       );
+    },
+  );
+
+  testWidgets(
+    'invalid voucher recovery stays at the checkout button instead of jumping to top',
+    (tester) async {
+      tester.view.physicalSize = const Size(1206, 2622);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      await pumpSignedIn(
+        tester,
+        profile: customerProfile,
+        foodClient: FakeFoodClient(
+          stores: const [
+            FoodStoreSummary(id: _id, name: 'Quán', category: 'rice'),
+          ],
+        ),
+      );
+      final context = tester.element(find.byType(Scaffold).first);
+      final cart = context.read<FoodCartCubit>()
+        ..addItem(
+          storeId: _id,
+          storeName: 'Quán',
+          item: const FoodMenuItem(
+            id: 'i1',
+            name: 'Bánh mì',
+            priceVnd: 20000,
+            available: true,
+          ),
+          minOrderVnd: 0,
+        )
+        ..setDropoff(label: '123 Nguyễn Văn Linh', lat: 10.77, lng: 106.7)
+        ..setDeliveryFare(15000)
+        ..applyVoucher(code: 'FOOD20');
+      GoRouter.of(context).push('/customer/food/checkout');
+      await tester.pumpAndSettle();
+
+      final scrollable = find
+          .descendant(
+            of: find.byKey(const Key('food-checkout-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      final position = tester.state<ScrollableState>(scrollable).position;
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      final before = position.pixels;
+
+      await tester.tap(find.byKey(const Key('food-place-order')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('food-checkout-blocker')), findsOneWidget);
+      expect(position.pixels, moreOrLessEquals(before, epsilon: 0.5));
+      expect(
+        find.byKey(const Key('food-checkout-remove-invalid-voucher')),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(const Key('food-checkout-remove-invalid-voucher')),
+      );
+      await tester.pumpAndSettle();
+      expect(cart.state.voucherCode, isNull);
+      expect(cart.state.canCheckout, isTrue);
+      await tester.pump(const Duration(milliseconds: 350));
     },
   );
 

@@ -156,20 +156,43 @@ class _PlaceButton extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final blocker = checkoutBlockingMessage(cart, l10n);
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (blocker != null) ...[
-          Semantics(
-            liveRegion: true,
-            child: Text(
-              blocker,
-              key: const Key('food-checkout-blocker'),
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: DealGoColors.warning,
-                fontWeight: FontWeight.w700,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    blocker,
+                    key: const Key('food-checkout-blocker'),
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: DealGoColors.warning,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
               ),
-            ),
+              if (cart.voucherCode != null && cart.voucherDiscountVnd <= 0) ...[
+                const SizedBox(width: DealGoSpacing.s8),
+                TextButton(
+                  key: const Key('food-checkout-remove-invalid-voucher'),
+                  onPressed: () => context.read<FoodCartCubit>().applyVoucher(),
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(0, 36),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: DealGoSpacing.s8,
+                    ),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(l10n.voucherRemove),
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: DealGoSpacing.s8),
         ],
